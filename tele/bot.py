@@ -591,7 +591,7 @@ def get_main_menu_keyboard():
             InlineKeyboardButton("🎬 How To Use Bot", callback_data="how_to_use"),
             InlineKeyboardButton("📞 Connect Helpline", callback_data="helpline")
         ],
-        [InlineKeyboardButton("🎰 Lucky Game", callback_data="lucky_game")]
+        [InlineKeyboardButton("🎰 TRIAL KEYS", callback_data="lucky_game")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -960,7 +960,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
             [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
             [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx")],
+            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X (.SH)", callback_data="bulk_prod_streamerx")],
             [InlineKeyboardButton("STREAMER-X PRO", callback_data="bulk_prod_streamerpro"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
             [InlineKeyboardButton("GREED", callback_data="bulk_prod_greed"), InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="bulk_prod_primehook")],
             [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
@@ -1183,7 +1183,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "⚠️ <b>INSUFFICIENT BALANCE</b>"
             full_payment_text = (
                 "<b>Status:</b> <code>Waiting for Payment...</code>\n"
-                "<i>Pay using the QR code or UPI ID below.</i>\n\n"
+                "<i>Pay using the QR code below.</i>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"{title}\n\n"
                 f"🏺 <b>Product:</b> {product_name}\n"
@@ -1191,8 +1191,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💵 <b>Pay Amount:</b> ₹{amount}\n"
                 f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
                 f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
-                "💰 <b>UPI ID (Tap to Copy):</b>\n<code>9316292107@fam</code>\n\n"
-                "<i>Scan the QR code or use the UPI ID above to pay, then click 'Paid Confirmation'.</i>"
+                "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
             )
             
             full_keyboard = [

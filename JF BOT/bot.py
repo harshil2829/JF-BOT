@@ -1293,7 +1293,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "⚠️ <b>INSUFFICIENT BALANCE</b>"
             full_payment_text = (
                 "<b>Status:</b> <code>Waiting for Payment...</code>\n"
-                "<i>Pay using the QR code or UPI ID below.</i>\n\n"
+                "<i>Pay using the QR code below.</i>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"{title}\n\n"
                 f"🏺 <b>Product:</b> {product_name}\n"
@@ -1301,8 +1301,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💵 <b>Pay Amount:</b> ₹{amount}\n"
                 f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
                 f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
-                "💰 <b>UPI ID (Tap to Copy):</b>\n<code>9316292107@fam</code>\n\n"
-                "<i>Scan the QR code or use the UPI ID above to pay, then click 'Paid Confirmation'.</i>"
+                "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
             )
             
             full_keyboard = [
