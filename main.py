@@ -20,8 +20,8 @@ if __name__ == "__main__":
     
     time.sleep(2)
     print("Starting Telegram Bots...")
-    p1 = subprocess.Popen(["python3", "tele/bot.py"])
-    p2 = subprocess.Popen(["python3", "JF BOT/bot.py"])
+    p1 = subprocess.Popen(["python3", "bot.py"], cwd="tele")
+    p2 = subprocess.Popen(["python3", "bot.py"], cwd="JF BOT")
     
     try:
         p1.wait()
