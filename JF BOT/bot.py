@@ -1005,7 +1005,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("GREED CHEAT", callback_data="claim_trial_greed"), InlineKeyboardButton("STREAMER X (.SH)", callback_data="claim_trial_streamerx")],
             [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
         ]
-        await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 2 days. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
     if data.startswith("claim_trial_"):
@@ -1021,7 +1021,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_trial = trials.get(user_id, {"last_trial": 0, "strikes": 0, "banned": False})
         
         # 2 day check
-        cooldown_time = 48 * 60 * 60
+        cooldown_time = 24 * 60 * 60
         time_since_last = time.time() - user_trial["last_trial"]
         if time_since_last < cooldown_time:
             remaining_seconds = int(cooldown_time - time_since_last)
@@ -1049,7 +1049,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         hist = json.load(f)
                 hist.append({
                     "user_id": user_id,
-                    "username": update.effective_user.username or "None",
+                    "username": update.effective_user.username or update.effective_user.first_name,
                     "product": product,
                     "key": delivered_key,
                     "time": time.time()
@@ -1522,7 +1522,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for log in hist[-15:]:
             import datetime
             date_str = datetime.datetime.fromtimestamp(log["time"]).strftime('%Y-%m-%d %H:%M')
-            text += f"• <b>@{log['username']}</b> (<code>{log['user_id']}</code>)\n  └ {log['product'].upper()} - <code>{log['key']}</code>\n"
+            uname = log.get('username', 'None')
+            display_name = f"@{uname}" if uname != "None" and update.effective_user.username else uname if uname != "None" else "User"
+            if uname == "None": display_name = "User"
+            elif " " in str(uname) or not str(uname).isascii(): display_name = uname # Likely a first name
+            else: display_name = f"@{uname}"
+            
+            text += f"• <b>{display_name}</b> (<code>{log['user_id']}</code>)\n  └ {log['product'].upper()} - <code>{log['key']}</code>\n"
         
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
