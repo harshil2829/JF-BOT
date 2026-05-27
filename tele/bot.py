@@ -981,7 +981,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton("7 Days", callback_data="bulk_dur_7d")],
             [InlineKeyboardButton("15 Days", callback_data="bulk_dur_15d"), InlineKeyboardButton("30 Days", callback_data="bulk_dur_30d")],
-            [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")]
+            [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="admin_add_keys")]
         ]
         await query.edit_message_text(f"⏳ <b>Select Duration for {product.upper()}:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
