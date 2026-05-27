@@ -59,6 +59,13 @@ def load_verified_users():
     doc = jf_col.find_one({"_id": "verified_users"})
     return doc["data"] if doc else []
 
+def load_trial_history():
+    doc = jf_col.find_one({"_id": "trial_history"})
+    return doc["data"] if doc else []
+
+def save_trial_history(hist):
+    jf_col.update_one({"_id": "trial_history"}, {"$set": {"data": hist}}, upsert=True)
+
 def save_verified_user(user_id):
     verified = load_verified_users()
     if user_id not in verified:
@@ -1044,10 +1051,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_trials(trials)
             
             try:
-                hist = []
-                if os.path.exists("trial_history.json"):
-                    with open("trial_history.json", "r") as f:
-                        hist = json.load(f)
+                hist = load_trial_history()
                 hist.append({
                     "user_id": user_id,
                     "username": update.effective_user.username or update.effective_user.first_name,
@@ -1055,8 +1059,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "key": delivered_key,
                     "time": time.time()
                 })
-                with open("trial_history.json", "w") as f:
-                    json.dump(hist[-50:], f, indent=4)
+                save_trial_history(hist[-50:])
             except:
                 pass
             
@@ -1528,12 +1531,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
         await query.edit_message_text("✅ All trial cooldowns have been reset! Every user can now claim another trial key.", reply_markup=InlineKeyboardMarkup(kb))
     elif data == "admin_trial_logs":
-        try:
-            with open("trial_history.json", "r") as f:
-                hist = json.load(f)
-            if not hist:
-                raise Exception
-        except:
+        hist = load_trial_history()
+        if not hist:
             kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
             await query.edit_message_text("❌ No trial logs found.", reply_markup=InlineKeyboardMarkup(kb))
             return
