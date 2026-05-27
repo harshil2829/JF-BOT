@@ -1130,7 +1130,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             dict_key = f"{product}_{dur}"
             if dict_key in keys:
                 cleared_count += len(keys[dict_key])
-                keys[dict_key] = []
+                del keys[dict_key]
         save_keys(keys)
         
         keyboard = [[InlineKeyboardButton("« Back", callback_data=f"bulk_prod_{product}")]]
@@ -1589,7 +1589,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keys = load_keys()
         text = "📦 <b>CURRENT STOCK</b>\n━━━━━━━━━━━━━━━━━━\n"
         for k, v in keys.items():
-            text += f"• {k.upper()}: {len(v)} keys\n"
+            if len(v) > 0:
+                text += f"• {k.upper()}: {len(v)} keys\n"
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_listresellers":
         resellers = load_resellers()
