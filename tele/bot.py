@@ -7,6 +7,17 @@ client = MongoClient(MONGO_URI)
 db = client['TelegramBotDB']
 tele_col = db['tele_data']
 
+import asyncio
+import json
+import random
+import string
+import time
+import datetime
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+import httpx
+
+
 def load_settings():
     doc = tele_col.find_one({"_id": "settings"})
     return doc["data"] if doc else {"admin_ids": [12345678]}
@@ -85,6 +96,17 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmgg
 client = MongoClient(MONGO_URI)
 db = client['TelegramBotDB']
 tele_col = db['tele_data']
+
+import asyncio
+import json
+import random
+import string
+import time
+import datetime
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+import httpx
+
 
 
 
