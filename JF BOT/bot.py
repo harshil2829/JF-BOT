@@ -547,7 +547,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-                    [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")]
+                    [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+                    [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")]
                 ]
                 await update.message.reply_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return
@@ -1498,7 +1499,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")]
+            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+            [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     elif data == "admin_guide_add":
@@ -1507,6 +1509,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To remove a VIP reseller, type:\n<code>/remove_reseller [user_id]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_bal":
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To add wallet balance, type:\n<code>/add_balance [user_id] [amount]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    elif data == "admin_reset_trial":
+        kb = [
+            [InlineKeyboardButton("Reset ALL Users", callback_data="admin_reset_trial_all")],
+            [InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text(
+            "🔄 <b>Reset Trial Cooldowns</b>\n\n"
+            "To reset the cooldown for a <b>SPECIFIC USER</b>, type this command:\n"
+            "<code>/reset_trial [user_id]</code>\n\n"
+            "To reset the cooldown for <b>ALL USERS</b> at once, click the button below.",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="HTML"
+        )
+    elif data == "admin_reset_trial_all":
+        save_trials({}) # Empty the trial dictionary
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        await query.edit_message_text("✅ All trial cooldowns have been reset! Every user can now claim another trial key.", reply_markup=InlineKeyboardMarkup(kb))
     elif data == "admin_trial_logs":
         try:
             with open("trial_history.json", "r") as f:
@@ -1632,6 +1651,26 @@ async def reset_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings["invite_link"] = ""
     save_settings(settings)
     await update.message.reply_text("✅ <b>All Force Join channels have been removed!</b>", parse_mode="HTML")
+
+async def reset_trial(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /reset_trial [user_id]")
+        return
+    
+    target_id = context.args[0]
+    trials = load_trials()
+    if target_id in trials:
+        trials[target_id]["last_trial"] = 0
+        save_trials(trials)
+        await update.message.reply_text(f"✅ Trial cooldown reset for user {target_id}!")
+    else:
+        trials[target_id] = {"last_trial": 0, "strikes": 0, "banned": False}
+        save_trials(trials)
+        await update.message.reply_text(f"✅ Trial cooldown reset for user {target_id}!")
 
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
