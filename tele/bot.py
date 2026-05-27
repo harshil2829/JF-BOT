@@ -17,6 +17,19 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import httpx
 
+# Enable logging
+import logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# CONFIGURATION
+TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs"
+UPI_GATEWAY_TOKEN = "0443e894-ef49-4f38-866d-e55fcab6408f" 
+IS_AUTO_MODE = False
+
+
 
 def load_settings():
     doc = tele_col.find_one({"_id": "settings"})
@@ -106,6 +119,19 @@ import datetime
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import httpx
+
+# Enable logging
+import logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# CONFIGURATION
+TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs"
+UPI_GATEWAY_TOKEN = "0443e894-ef49-4f38-866d-e55fcab6408f" 
+IS_AUTO_MODE = False
+
 
 
 
