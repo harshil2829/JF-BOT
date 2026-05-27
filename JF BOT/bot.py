@@ -1,6 +1,5 @@
 import logging
 import os
-
 from pymongo import MongoClient
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
@@ -85,42 +84,114 @@ def save_reseller_logs(user_id, product, key):
     if len(logs) > 50: logs = logs[-50:]
     jf_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
 
-import asyncio
-import json
+def log_reseller_action(user_id, product, duration_label):
+    save_reseller_logs(user_id, product, "N/A")
+
 import os
-import random
-import string
-import time
-import datetime
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler, ChatMemberHandler
-import httpx
 
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+from pymongo import MongoClient
 
-# CONFIGURATION
-TOKEN = "7994962595:AAGOZdezJAetEVJPCpbOVqAds7AYaypWlRY"
-SETTINGS_FILE = "settings.json"
-USERS_FILE = "users.json"
-VERIFIED_USERS_FILE = "verified_users.json"
-KEYS_FILE = "keys.json"
-UTR_LOG_FILE = "utr_log.json"
-BALANCES_FILE = "balances.json"
-RESELLERS_FILE = "resellers.json"
-RESELLER_LOGS_FILE = "reseller_logs.json"
-TRIAL_LOGS_FILE = "trial_logs.json"
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
+client = MongoClient(MONGO_URI)
+db = client['TelegramBotDB']
+jf_col = db['jf_data']
 
-# --- UPI GATEWAY CONFIG ---
-# Using UPIGateway.com (Merchant Dashboard)
-UPI_GATEWAY_TOKEN = "7994962595:AAGOZdezJAetEVJPCpbOVqAds7AYaypWlRY" 
-IS_AUTO_MODE = False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Default settings if file is missing
+DEFAULT_SETTINGS = {
+    "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
+    "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
+}
+
+
+
+
+
+
+
+
+
+
+def is_banned(user_id):
+    trials = load_trials()
+    return trials.get(str(user_id), {}).get("banned", False)
+
+async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    result = update.chat_member
+    if not result: return
+    user_id = str(result.new_chat_member.user.id)
+    if result.new_chat_member.status in ['left', 'kicked']:
+        trials = load_trials()
+        if user_id not in trials:
+            trials[user_id] = {"last_trial": 0, "strikes": 0, "banned": False}
+        trials[user_id]["strikes"] += 1
+        if trials[user_id]["strikes"] >= 3:
+            trials[user_id]["banned"] = True
+        save_trials(trials)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 async def get_unjoined_channels(user_id, context):

@@ -1,6 +1,5 @@
 import logging
 import os
-
 from pymongo import MongoClient
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
@@ -78,41 +77,85 @@ def save_reseller_logs(user_id, product, key):
     if len(logs) > 50: logs = logs[-50:]
     tele_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
 
-import asyncio
-import json
 import os
-import random
-import string
-import time
-import datetime
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
-import httpx
 
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+from pymongo import MongoClient
 
-# CONFIGURATION
-TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs"
-SETTINGS_FILE = "settings.json"
-USERS_FILE = "users.json"
-VERIFIED_USERS_FILE = "verified_users.json"
-KEYS_FILE = "keys.json"
-UTR_LOG_FILE = "utr_log.json"
-BALANCES_FILE = "balances.json"
-RESELLERS_FILE = "resellers.json"
-RESELLER_LOGS_FILE = "reseller_logs.json"
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
+client = MongoClient(MONGO_URI)
+db = client['TelegramBotDB']
+tele_col = db['tele_data']
 
-# --- UPI GATEWAY CONFIG ---
-# Using UPIGateway.com (Merchant Dashboard)
-UPI_GATEWAY_TOKEN = "0443e894-ef49-4f38-866d-e55fcab6408f" 
-IS_AUTO_MODE = False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Default settings if file is missing
+DEFAULT_SETTINGS = {
+    "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
+    "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 async def get_unjoined_channels(user_id, context):
