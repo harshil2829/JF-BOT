@@ -998,11 +998,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "shop":
-        await query.edit_message_text(
-            "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:",
-            reply_markup=get_shop_keyboard(),
-            parse_mode="HTML"
-        )
+        text = "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:"
+        keyboard = get_shop_keyboard()
+        if query.message.photo or query.message.document:
+            await query.message.delete()
+            await context.bot.send_message(chat_id=query.message.chat_id, text=text, reply_markup=keyboard, parse_mode="HTML")
+        else:
+            await query.edit_message_text(text=text, reply_markup=keyboard, parse_mode="HTML")
     elif data == "main_menu":
         await query.edit_message_text(
             settings["welcome_text"].format(name=update.effective_user.first_name),

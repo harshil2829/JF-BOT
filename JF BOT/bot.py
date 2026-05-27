@@ -1027,7 +1027,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             remaining_seconds = int(cooldown_time - time_since_last)
             h, remainder = divmod(remaining_seconds, 3600)
             m, s = divmod(remainder, 60)
-            await query.answer(f"⏳ Please wait for {h}h {m}m {s}s. You will receive it after this time.", show_alert=True)
+            keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
+            await query.edit_message_text(f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next trial key after this time.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return
             
         # Give key
@@ -1108,11 +1109,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "shop":
-        await query.edit_message_text(
-            "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:",
-            reply_markup=get_shop_keyboard(),
-            parse_mode="HTML"
-        )
+        text = "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:"
+        keyboard = get_shop_keyboard()
+        if query.message.photo or query.message.document:
+            await query.message.delete()
+            await context.bot.send_message(chat_id=query.message.chat_id, text=text, reply_markup=keyboard, parse_mode="HTML")
+        else:
+            await query.edit_message_text(text=text, reply_markup=keyboard, parse_mode="HTML")
     elif data == "main_menu":
         await query.edit_message_text(
             settings["welcome_text"].format(name=update.effective_user.first_name),
