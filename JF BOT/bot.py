@@ -1052,10 +1052,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Give key
         keys = load_keys()
         dict_key = f"{product}_trial"
-        if dict_key in keys and len(keys[dict_key]) > 0:
+        
+        delivered_key = None
+        if product == "hxn":
+            delivered_key = await generate_key_from_api("hxn", "1d")
+        elif dict_key in keys and len(keys[dict_key]) > 0:
             delivered_key = keys[dict_key].pop(0)
             save_keys(keys)
             
+        if delivered_key:
             user_trial["last_trial"] = time.time()
             user_trial["last_key"] = delivered_key
             user_trial["last_product"] = product.upper()
@@ -1110,9 +1115,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton("7 Days", callback_data="bulk_dur_7d")],
             [InlineKeyboardButton("15 Days", callback_data="bulk_dur_15d"), InlineKeyboardButton("30 Days", callback_data="bulk_dur_30d")],
             [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")],
+            [InlineKeyboardButton("🗑️ Clear All Stock", callback_data=f"clear_stock_{product}")],
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_add_keys")]
         ]
         await query.edit_message_text(f"⏳ <b>Select Duration for {product.upper()}:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        return
+        
+    if data.startswith("clear_stock_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        product = data.split("_")[2]
+        keys = load_keys()
+        cleared_count = 0
+        for dur in ["1d", "3d", "7d", "15d", "30d", "trial"]:
+            dict_key = f"{product}_{dur}"
+            if dict_key in keys:
+                cleared_count += len(keys[dict_key])
+                keys[dict_key] = []
+        save_keys(keys)
+        
+        keyboard = [[InlineKeyboardButton("« Back", callback_data=f"bulk_prod_{product}")]]
+        await query.edit_message_text(f"✅ <b>STOCK CLEARED</b>\n━━━━━━━━━━━━━━\nSuccessfully deleted {cleared_count} keys for {product.upper()}.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
     if data.startswith("bulk_dur_"):
