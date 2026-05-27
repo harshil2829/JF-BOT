@@ -1103,7 +1103,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["bulk_duration"] = duration
         context.user_data["state"] = "awaiting_bulk_keys"
         product = context.user_data.get("bulk_product", "Unknown")
-        await query.edit_message_text(f"📝 <b>SEND KEYS NOW</b>\n━━━━━━━━━━━━━━━━━━\nProduct: {product.upper()}\nDuration: {duration.upper()}\n\nSend me the keys as a normal message. You can send 1 key, or a list of multiple keys (separated by spaces or new lines).", parse_mode="HTML")
+        keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_add_keys")]]
+        await query.edit_message_text(f"📝 <b>SEND KEYS NOW</b>\n━━━━━━━━━━━━━━━━━━\nProduct: {product.upper()}\nDuration: {duration.upper()}\n\nSend me the keys as a normal message. You can send 1 key, or a list of multiple keys (separated by spaces or new lines).", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
 
     if data == "shop":
