@@ -996,7 +996,10 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except:
+        pass
     data = query.data
     settings = load_settings()
     
@@ -1036,7 +1039,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             h, remainder = divmod(remaining_seconds, 3600)
             m, s = divmod(remainder, 60)
             keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
-            await query.edit_message_text(f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next trial key after this time.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            last_key = user_trial.get("last_key", "None")
+            last_prod = user_trial.get("last_product", "Unknown").upper()
+            
+            msg = f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next trial key after this time."
+            if last_key != "None":
+                msg += f"\n\n🔑 <b>Your Last Key ({last_prod}):</b>\n<code>{last_key}</code>"
+                
+            await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return
             
         # Give key
@@ -1047,6 +1057,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_keys(keys)
             
             user_trial["last_trial"] = time.time()
+            user_trial["last_key"] = delivered_key
+            user_trial["last_product"] = product.upper()
             trials[user_id] = user_trial
             save_trials(trials)
             
@@ -1661,7 +1673,7 @@ async def reset_trial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /reset_trial [user_id]")
         return
     
-    target_id = context.args[0]
+    target_id = str(context.args[0]).strip()
     trials = load_trials()
     if target_id in trials:
         trials[target_id]["last_trial"] = 0
