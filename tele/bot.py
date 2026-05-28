@@ -14,7 +14,7 @@ import string
 import time
 import datetime
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler, ChatJoinRequestHandler
 import httpx
 
 # Enable logging
@@ -1540,6 +1540,14 @@ async def run_bot():
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
     application.add_handler(CallbackQueryHandler(button_handler))
+    
+    async def join_request_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            await update.chat_join_request.approve()
+        except:
+            pass
+            
+    application.add_handler(ChatJoinRequestHandler(join_request_handler))
 
     async with application:
         await application.initialize()
