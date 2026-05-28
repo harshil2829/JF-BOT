@@ -1731,6 +1731,7 @@ async def run_bot():
     application.add_handler(CommandHandler("stock", check_stock))
     application.add_handler(CommandHandler("add_channel", add_channel))
     application.add_handler(CommandHandler("reset_channels", reset_channels))
+    application.add_handler(CommandHandler("reset_trial", reset_trial))
     
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
