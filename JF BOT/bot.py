@@ -1704,12 +1704,12 @@ async def reset_trial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trials[target_id] = {"last_trial": 0, "strikes": 0, "banned": False}
         
     save_trials(trials)
-    await update.message.reply_text(f"✅ Trial cooldown reset for user {target_id}!")
     
     try:
         await context.bot.send_message(chat_id=target_id, text="🎉 <b>GOOD NEWS!</b>\n━━━━━━━━━━━━━━\nYour Trial Key cooldown has been reset by the Admin!\n\nYou can now claim another Trial Key immediately.", parse_mode="HTML")
+        await update.message.reply_text(f"✅ Trial cooldown reset for user {target_id}!\n📩 Notification successfully sent to the user.")
     except:
-        pass
+        await update.message.reply_text(f"✅ Trial cooldown reset for user {target_id}!\n⚠️ Could not send notification (user might have blocked the bot).")
 
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
