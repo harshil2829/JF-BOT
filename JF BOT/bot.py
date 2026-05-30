@@ -1133,7 +1133,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
             [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("VIPER", callback_data="bulk_prod_viper")],
             [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
-            [InlineKeyboardButton("HWAK", callback_data="bulk_prod_hwak")],
+            [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
+            [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("ANGRY MOD", callback_data="bulk_prod_angry")],
+            [InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid"), InlineKeyboardButton("YOONSO", callback_data="bulk_prod_yoonso")],
+            [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure")],
+            [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
+            [InlineKeyboardButton("OS VICTORY 8BP", callback_data="bulk_prod_osvictory")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         context.user_data["state"] = "awaiting_bulk_product"
