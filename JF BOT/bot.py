@@ -357,7 +357,9 @@ async def generate_key_from_api(product, duration_label):
     # Map products to IDs (You can add more later)
     product_map = {
         "hxn": 1,
-        "primex": 2 
+        "prime": 2,
+        "harshil": 1,
+        "streamerx": 1
     }
     product_id = product_map.get(product.lower(), 1)
     
@@ -650,11 +652,11 @@ def get_shop_keyboard():
         ],
         [
             InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
-            InlineKeyboardButton("ALPHA-X-STORE", callback_data="product_alpha")
+            InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha")
         ],
         [
-            InlineKeyboardButton("PRIME X", callback_data="product_prime"),
-            InlineKeyboardButton("HARSHIL", callback_data="product_harshil")
+            InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
+            InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil")
         ],
         [
             InlineKeyboardButton("BOOYAH MOD", callback_data="product_boyyah"),
@@ -666,27 +668,36 @@ def get_shop_keyboard():
         ],
         [
             InlineKeyboardButton("GREED CHEAT", callback_data="product_greed"),
-            InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="product_primehook")
+            InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity")
         ],
         [
-            InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
-            InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite")
+            InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
+            InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam")
         ],
         [
-            InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
-            InlineKeyboardButton("BR MODS", callback_data="product_brmods")
+            InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
+            InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj")
         ],
         [
-            InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
-            InlineKeyboardButton("VIPER TEAM", callback_data="product_viper")
+            InlineKeyboardButton("VIPER TEAM", callback_data="product_viper"),
+            InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond")
         ],
         [
-            InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
-            InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio")
+            InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
+            InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk")
         ],
         [
-            InlineKeyboardButton("HWAK CHEATS", callback_data="product_hwak")
+            InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
+            InlineKeyboardButton("ANGRY MOD", callback_data="product_angry")
         ],
+        [
+            InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
+            InlineKeyboardButton("YOONSO BUTTERFLY", callback_data="product_yoonso")
+        ],
+        [InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_primehook")],
+        [InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure")],
+        [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra")],
+        [InlineKeyboardButton("OS VICTORY 8BP", callback_data="product_osvictory")],
         [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(keyboard)
