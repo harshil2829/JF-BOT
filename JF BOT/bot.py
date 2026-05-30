@@ -357,7 +357,7 @@ async def generate_key_from_api(product, duration_label):
     # Map products to IDs (You can add more later)
     product_map = {
         "hxn": 1,
-        "prime": 2,
+        "prime": 1,
         "harshil": 1,
         "streamerxsh": 1
     }
