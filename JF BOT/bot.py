@@ -1765,6 +1765,8 @@ async def run_bot():
     application.add_handler(CommandHandler("add_channel", add_channel))
     application.add_handler(CommandHandler("reset_channels", reset_channels))
     application.add_handler(CommandHandler("reset_trial", reset_trial))
+    application.add_handler(CommandHandler("lock_trial", lock_trial_cmd))
+    application.add_handler(CommandHandler("unlock_trial", unlock_trial_cmd))
     
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
@@ -1778,9 +1780,6 @@ async def run_bot():
             pass
             
     application.add_handler(ChatJoinRequestHandler(join_request_handler))
-
-    application.add_handler(CommandHandler("lock_trial", lock_trial_cmd))
-    application.add_handler(CommandHandler("unlock_trial", unlock_trial_cmd))
     
     async with application:
         await application.initialize()
