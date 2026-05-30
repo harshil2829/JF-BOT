@@ -1009,6 +1009,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "trial_key":
+        settings = load_settings()
+        if settings.get("trial_locked", False):
+            msg = ("🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
+                   "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
+                   "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
+                   "<b>OR DEVLOPER :-</b>@rajput_harshil")
+            kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
+            await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            return
         keyboard = [
             [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
             [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
@@ -1711,6 +1720,20 @@ async def reset_trial(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         await update.message.reply_text(f"✅ Trial cooldown reset for user {target_id}!\n⚠️ Could not send notification (user might have blocked the bot).")
 
+async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]: return
+    settings["trial_locked"] = True
+    save_settings(settings)
+    await update.message.reply_text("🔒 Trial Key Section Locked!")
+
+async def unlock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]: return
+    settings["trial_locked"] = False
+    save_settings(settings)
+    await update.message.reply_text("🔓 Trial Key Section Unlocked!")
+
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
 
@@ -1746,6 +1769,9 @@ async def run_bot():
             
     application.add_handler(ChatJoinRequestHandler(join_request_handler))
 
+    application.add_handler(CommandHandler("lock_trial", lock_trial_cmd))
+    application.add_handler(CommandHandler("unlock_trial", unlock_trial_cmd))
+    
     async with application:
         await application.initialize()
         await application.start()
