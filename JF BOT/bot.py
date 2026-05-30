@@ -1029,6 +1029,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     if data.startswith("claim_trial_"):
+        settings = load_settings()
+        if settings.get("trial_locked", False):
+            msg = ("🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
+                   "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
+                   "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
+                   "<b>OR DEVLOPER :-</b>@rajput_harshil")
+            kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
+            await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            return
+
         product = data.split("_")[2]
         user_id = str(update.effective_user.id)
         
