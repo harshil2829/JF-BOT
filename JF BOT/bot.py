@@ -359,7 +359,7 @@ async def generate_key_from_api(product, duration_label):
         "hxn": 1,
         "prime": 2,
         "harshil": 1,
-        "streamerx": 1
+        "streamerxsh": 1
     }
     product_id = product_map.get(product.lower(), 1)
     
@@ -694,7 +694,8 @@ def get_shop_keyboard():
             InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
             InlineKeyboardButton("YOONSO BUTTERFLY", callback_data="product_yoonso")
         ],
-        [InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_primehook")],
+        [InlineKeyboardButton("PRIME HOOK (.SH)", callback_data="product_primehook")],
+        [InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh")],
         [InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure")],
         [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra")],
         [InlineKeyboardButton("OS VICTORY 8BP", callback_data="product_osvictory")],
@@ -889,7 +890,7 @@ async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product = context.args[0].lower()
     duration_label = context.args[1].lower()
     
-    auto_products = ["hxn", "prime", "harshil"]
+    auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
     delivered_key = None
     
     status_msg = await update.message.reply_text("🔄 Generating key...")
@@ -1411,7 +1412,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             balances[user_id_str] -= amount
             save_balances(balances)
             
-            auto_products = ["hxn", "prime", "harshil"]
+            auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
             delivered_key = None
             
             if product in auto_products:
@@ -1479,7 +1480,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duration_label = context.user_data.get("duration", "1d")
         
         # 1. GENERATE OR FETCH KEY
-        auto_products = ["hxn", "prime", "harshil"]
+        auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
         
         if product in auto_products:
             delivered_key = await generate_key_from_api(product, duration_label)
