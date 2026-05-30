@@ -484,6 +484,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         order_id = context.user_data.get("order_id", "Unknown")
         product = context.user_data.get("product", "Unknown")
         amount = context.user_data.get("amount", "0")
+        duration = context.user_data.get("duration", "1d")
         utr = update.message.text
         
         # 1. Prevent Double Use of UTR
@@ -526,6 +527,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 <b>User:</b> {user.first_name} (@{user.username})\n"
             f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
             f"🏺 <b>Product:</b> {product}\n"
+            f"⏳ <b>Duration:</b> {duration}\n"
             f"📦 <b>Order ID:</b> <code>{order_id}</code>\n"
             f"💵 <b>Amount:</b> ₹{amount}\n"
             f"💬 <b>UTR/Proof:</b> {utr or 'Photo attached'}"
@@ -533,7 +535,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user.id}_{product}_{order_id}"),
+                InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user.id}_{product}_{order_id}_{duration}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")
             ]
         ])
@@ -1316,7 +1318,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product_name = product_key.upper()
         days = duration_map.get(duration, duration)
         amount = price_map.get(duration, "0.00")
-        order_id = "OID" + "".join(random.choices(string.ascii_uppercase + string.digits, k=20))
+        order_id = "OID" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         
         # Store transaction details
         context.user_data["product"] = product_key
@@ -1470,14 +1472,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["order_id"] = order_id
 
     elif data.startswith("approve_"):
-        # approve_userid_product_orderid
+        # approve_userid_product_orderid_duration
         parts = data.split("_")
         target_user_id = int(parts[1])
         product = parts[2].lower()
         order_id = parts[3]
         
-        # Get duration from user_data (stored when they clicked the plan)
-        duration_label = context.user_data.get("duration", "1d")
+        # Extract duration from callback data if present, otherwise default to 1d
+        if len(parts) > 4:
+            duration_label = parts[4]
+        else:
+            duration_label = context.user_data.get("duration", "1d")
         
         # 1. GENERATE OR FETCH KEY
         auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
