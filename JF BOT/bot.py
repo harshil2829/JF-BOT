@@ -1804,10 +1804,6 @@ async def unlock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_settings(settings)
     await update.message.reply_text("🔓 Trial Key Section Unlocked!")
 
-async def run_bot():
-    application = Application.builder().token(TOKEN).build()
-
-    # Handlers
 async def rperms_cmd(update, context):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -1825,6 +1821,10 @@ async def rperms_cmd(update, context):
     save_reseller_perms(perms)
     await update.message.reply_text(f"✅ Permissions updated for reseller {target_id}.\nAllowed: {perms[target_id]}")
 
+async def run_bot():
+    application = Application.builder().token(TOKEN).build()
+
+    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_my_id))
     application.add_handler(CommandHandler("admin", admin_panel))
