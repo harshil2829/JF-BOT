@@ -111,7 +111,9 @@ def save_resellers(resellers):
 
 def load_reseller_logs():
     doc = jf_col.find_one({"_id": "reseller_logs"})
-    return doc["data"] if doc else []
+    if doc and isinstance(doc.get("data"), list):
+        return doc["data"]
+    return []
 
 def save_reseller_logs(username, user_id, product, key):
     logs = load_reseller_logs()
@@ -921,7 +923,7 @@ async def rlogs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for log in user_logs:
         text += f"• {log}\n"
         
-    text += f"\n<i>Total keys generated: {len(logs[target_id])}</i>"
+    text += f"\n<i>Total keys generated: {len(user_logs)}</i>"
     await update.message.reply_text(text, parse_mode="HTML")
 
 async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1763,7 +1765,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"📋 <b>RESELLER LOGS: {target_id}</b>\n━━━━━━━━━━━━━━━━━━\n"
         for log in user_logs:
             text += f"• {log}\n"
-        text += f"\n<i>Total keys generated: {len(logs[target_id])}</i>"
+        text += f"\n<i>Total keys generated: {len(user_logs)}</i>"
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "check_joined":
         if not await check_force_sub(query.from_user.id, context):
