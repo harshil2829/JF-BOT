@@ -1462,84 +1462,89 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
 
     elif data.startswith("walletpay_"):
-        debug_log(f"Clicked walletpay: {data}")
-        order_id = data.split("_")[1]
-        amount = float(context.user_data.get("amount", "0"))
-        product = context.user_data.get("product", "hxn")
-        duration_label = context.user_data.get("duration", "1d")
+        try:
+            debug_log(f"Clicked walletpay: {data}")
+            order_id = data.split("_")[1]
+            amount = float(context.user_data.get("amount", "0"))
+            product = context.user_data.get("product", "hxn")
+            duration_label = context.user_data.get("duration", "1d")
         
-        user_id_str = str(query.from_user.id)
-        balances = load_balances()
-        user_bal = balances.get(user_id_str, 0.0)
+            user_id_str = str(query.from_user.id)
+            balances = load_balances()
+            user_bal = balances.get(user_id_str, 0.0)
         
-        debug_log(f"user_bal: {user_bal}, amount: {amount}")
-        if user_bal >= amount:
-            debug_log("Sufficient balance")
-            balances[user_id_str] -= amount
-            save_balances(balances)
-            
-            auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
-            delivered_key = None
-            
-            if product in auto_products:
-                delivered_key = await generate_key_from_api(product, duration_label)
-            else:
-                dict_key = f"{product}_{duration_label}"
-                keys = load_keys()
-                if dict_key in keys and len(keys[dict_key]) > 0:
-                    delivered_key = keys[dict_key].pop(0)
-                    save_keys(keys)
-            
-            debug_log(f"Delivered key: {delivered_key}")
-            if delivered_key:
-                resellers_check = load_resellers()
-                username_str = f"@{query.from_user.username}" if query.from_user.username else str(query.from_user.first_name)
-                
-                if user_id_str in resellers_check:
-                    debug_log("Calling log_reseller_action")
-                    log_reseller_action(username_str, user_id_str, product, delivered_key)
-                    debug_log("log_reseller_action finished")
-                
-                settings = load_settings()
-                admin_ids = settings.get("admin_ids", [])
-                for admin_id in admin_ids:
-                    try:
-                        admin_msg = (
-                            f"🔔 <b>NEW WALLET PURCHASE</b>\\n"
-                            f"━━━━━━━━━━━━━━━━━━\\n"
-                            f"👤 <b>User:</b> {username_str} (<code>{user_id_str}</code>)\\n"
-                            f"🏺 <b>Product:</b> {product.upper()}\\n"
-                            f"⏳ <b>Duration:</b> {duration_label.upper()}\\n"
-                            f"💵 <b>Amount Paid:</b> ₹{amount}\\n"
-                            f"🔑 <b>Key Generated:</b> <code>{delivered_key}</code>\\n"
-                        )
-                        await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
-                    except:
-                        pass
-                
-                success_msg = (
-                    "✅ <b>PURCHASE SUCCESSFUL!</b>\n"
-                    "━━━━━━━━━━━━━━━━━━\n"
-                    f"🏺 <b>Product:</b> {product.upper()}\n"
-                    f"⏳ <b>Duration:</b> {duration_label.upper()}\n"
-                    f"💰 <b>Remaining Balance:</b> ₹{balances[user_id_str]:.2f}\n"
-                    "━━━━━━━━━━━━━━━━━━\n"
-                    f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
-                    "<i>Thank you for shopping with us!</i>"
-                )
-                debug_log("Editing success msg")
-                await query.edit_message_text(text=success_msg, parse_mode="HTML")
-                debug_log("Edited success msg")
-            else:
-                balances[user_id_str] += amount
+            debug_log(f"user_bal: {user_bal}, amount: {amount}")
+            if user_bal >= amount:
+                debug_log("Sufficient balance")
+                balances[user_id_str] -= amount
                 save_balances(balances)
-                await query.answer(f"❌ ERROR! Out of stock for {product.upper()}. Balance refunded.", show_alert=True)
-                await query.edit_message_text("❌ Payment refunded due to out-of-stock. Please contact Admin.")
-        else:
-            await query.answer("❌ Insufficient balance!", show_alert=True)
+            
+                auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
+                delivered_key = None
+            
+                if product in auto_products:
+                    delivered_key = await generate_key_from_api(product, duration_label)
+                else:
+                    dict_key = f"{product}_{duration_label}"
+                    keys = load_keys()
+                    if dict_key in keys and len(keys[dict_key]) > 0:
+                        delivered_key = keys[dict_key].pop(0)
+                        save_keys(keys)
+            
+                debug_log(f"Delivered key: {delivered_key}")
+                if delivered_key:
+                    resellers_check = load_resellers()
+                    username_str = f"@{query.from_user.username}" if query.from_user.username else str(query.from_user.first_name)
+                
+                    if user_id_str in resellers_check:
+                        debug_log("Calling log_reseller_action")
+                        log_reseller_action(username_str, user_id_str, product, delivered_key)
+                        debug_log("log_reseller_action finished")
+                
+                    settings = load_settings()
+                    admin_ids = settings.get("admin_ids", [])
+                    for admin_id in admin_ids:
+                        try:
+                            admin_msg = (
+                                f"🔔 <b>NEW WALLET PURCHASE</b>\\n"
+                                f"━━━━━━━━━━━━━━━━━━\\n"
+                                f"👤 <b>User:</b> {username_str} (<code>{user_id_str}</code>)\\n"
+                                f"🏺 <b>Product:</b> {product.upper()}\\n"
+                                f"⏳ <b>Duration:</b> {duration_label.upper()}\\n"
+                                f"💵 <b>Amount Paid:</b> ₹{amount}\\n"
+                                f"🔑 <b>Key Generated:</b> <code>{delivered_key}</code>\\n"
+                            )
+                            await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
+                        except:
+                            pass
+                
+                    success_msg = (
+                        "✅ <b>PURCHASE SUCCESSFUL!</b>\n"
+                        "━━━━━━━━━━━━━━━━━━\n"
+                        f"🏺 <b>Product:</b> {product.upper()}\n"
+                        f"⏳ <b>Duration:</b> {duration_label.upper()}\n"
+                        f"💰 <b>Remaining Balance:</b> ₹{balances[user_id_str]:.2f}\n"
+                        "━━━━━━━━━━━━━━━━━━\n"
+                        f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
+                        "<i>Thank you for shopping with us!</i>"
+                    )
+                    debug_log("Editing success msg")
+                    await query.edit_message_text(text=success_msg, parse_mode="HTML")
+                    debug_log("Edited success msg")
+                else:
+                    balances[user_id_str] += amount
+                    save_balances(balances)
+                    await query.answer(f"❌ ERROR! Out of stock for {product.upper()}. Balance refunded.", show_alert=True)
+                    await query.edit_message_text("❌ Payment refunded due to out-of-stock. Please contact Admin.")
+            else:
+                await query.answer("❌ Insufficient balance!", show_alert=True)
 
 
 
+        except Exception as e:
+            import traceback
+            err = traceback.format_exc()
+            await query.edit_message_text(f"⚠️ INTERNAL ERROR:\n<pre>{err[-500:]}</pre>", parse_mode="HTML")
     elif data.startswith("confirm_"):
         order_id = data.split("_")[1]
         confirm_text = (
