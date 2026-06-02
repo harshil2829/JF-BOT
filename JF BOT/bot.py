@@ -115,6 +115,20 @@ def save_reseller_logs(user_id, product, key):
     if len(logs) > 50: logs = logs[-50:]
     jf_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
 
+def load_referrals():
+    if not os.path.exists("referrals.json"): return {}
+    with open("referrals.json", "r") as f: return json.load(f)
+
+def save_referrals(refs):
+    with open("referrals.json", "w") as f: json.dump(refs, f, indent=4)
+
+def load_reseller_perms():
+    if not os.path.exists("reseller_perms.json"): return {}
+    with open("reseller_perms.json", "r") as f: return json.load(f)
+
+def save_reseller_perms(perms):
+    with open("reseller_perms.json", "w") as f: json.dump(perms, f, indent=4)
+
 def log_reseller_action(user_id, product, duration_label):
     save_reseller_logs(user_id, product, "N/A")
 
@@ -390,6 +404,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🚫 You are banned from this bot for abusing the trial system.")
         return
     save_user(user_id)
+    
+    # Referral System
+    if context.args and len(context.args) > 0:
+        referrer_id = context.args[0]
+        if str(referrer_id).isdigit() and str(referrer_id) != str(user_id):
+            refs = load_referrals()
+            if "referred" not in refs: refs["referred"] = []
+            if "users" not in refs: refs["users"] = {}
+            if user_id not in refs["referred"]:
+                refs["referred"].append(user_id)
+                if referrer_id not in refs["users"]: refs["users"][referrer_id] = {"count": 0, "earnings": 0.0}
+                refs["users"][referrer_id]["count"] += 1
+                refs["users"][referrer_id]["earnings"] += 10.0
+                save_referrals(refs)
+                
+                bals = load_balances()
+                bals[int(referrer_id)] = bals.get(int(referrer_id), 0) + 10
+                save_balances(bals)
+                
+                try:
+                    await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00!", parse_mode="HTML")
+                except:
+                    pass
     
     verified_users = load_verified_users()
     settings = load_settings()
@@ -859,16 +896,14 @@ async def rlogs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_id = str(context.args[0])
     logs = load_reseller_logs()
     
-    if target_id not in logs or len(logs[target_id]) == 0:
+    user_logs = [log for log in logs if f"User {target_id}" in log][-20:]
+    if not user_logs:
         await update.message.reply_text("❌ No activity found for this reseller.")
         return
-        
-    user_logs = logs[target_id][-20:] # Get last 20 actions
     
     text = f"📋 <b>RESELLER LOGS: {target_id}</b>\n━━━━━━━━━━━━━━━━━━\n"
     for log in user_logs:
-        date_str = datetime.datetime.fromtimestamp(log["time"]).strftime('%Y-%m-%d %H:%M')
-        text += f"• {date_str} - Generated {log['product'].upper()} ({log['duration']})\n"
+        text += f"• {log}\n"
         
     text += f"\n<i>Total keys generated: {len(logs[target_id])}</i>"
     await update.message.reply_text(text, parse_mode="HTML")
@@ -1037,7 +1072,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
             [InlineKeyboardButton("BOOYAH MOD", callback_data="claim_trial_boyyah"), InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo")],
             [InlineKeyboardButton("GREED CHEAT", callback_data="claim_trial_greed"), InlineKeyboardButton("STREAMER X (.SH)", callback_data="claim_trial_streamerx")],
-            [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+            [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
         ]
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
@@ -1187,7 +1222,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "shop":
         text = "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:"
-        keyboard = get_shop_keyboard()
+        keyboard = get_shop_keyboard(update.effective_user.id)
         if query.message.photo or query.message.document:
             await query.message.delete()
             await context.bot.send_message(chat_id=query.message.chat_id, text=text, reply_markup=keyboard, parse_mode="HTML")
@@ -1239,13 +1274,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "referral":
         bot_username = (await context.bot.get_me()).username
         referral_link = f"https://t.me/{bot_username}?start={update.effective_user.id}"
+        refs = load_referrals()
+        user_refs = refs.get("users", {}).get(str(update.effective_user.id), {"count": 0, "earnings": 0.0})
+        count = user_refs["count"]
+        earnings = user_refs["earnings"]
         await query.edit_message_text(
             "🎁 <b>REFERRAL SYSTEM</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "Invite your friends and earn rewards!\n\n"
+            "Invite your friends and earn ₹10 to your wallet per invite!\n\n"
             f"🔗 <b>Your Link:</b>\n<code>{referral_link}</code>\n\n"
-            "👥 <b>Total Referrals:</b> 0\n"
-            "💰 <b>Earnings:</b> ₹0.00",
+            f"👥 <b>Total Referrals:</b> {count}\n"
+            f"💰 <b>Earnings:</b> ₹{earnings:.2f}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
             parse_mode="HTML"
         )
@@ -1658,14 +1697,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("admin_seelog_"):
         target_id = data.split("_")[2]
         logs = load_reseller_logs()
-        if target_id not in logs or len(logs[target_id]) == 0:
+        user_logs = [log for log in logs if f"User {target_id}" in log][-20:]
+        if not user_logs:
             kb = [[InlineKeyboardButton("« Back", callback_data="admin_logsmode")]]; await query.edit_message_text("❌ No activity found for this reseller.", reply_markup=InlineKeyboardMarkup(kb))
             return
-        user_logs = logs[target_id][-20:]
         text = f"📋 <b>RESELLER LOGS: {target_id}</b>\n━━━━━━━━━━━━━━━━━━\n"
         for log in user_logs:
-            date_str = datetime.datetime.fromtimestamp(log["time"]).strftime('%Y-%m-%d %H:%M')
-            text += f"• {date_str} - Gen {log['product'].upper()} ({log['duration']})\n"
+            text += f"• {log}\n"
         text += f"\n<i>Total keys generated: {len(logs[target_id])}</i>"
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "check_joined":
@@ -1770,6 +1808,23 @@ async def run_bot():
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
+async def rperms_cmd(update, context):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /rperms [reseller_id] [product1,product2 OR clear]\nExample: /rperms 123456789 hxn,hex,prime")
+        return
+    target_id = context.args[0]
+    perms_str = context.args[1]
+    perms = load_reseller_perms()
+    if perms_str.lower() == "clear":
+        perms[target_id] = []
+    else:
+        perms[target_id] = perms_str.split(",")
+    save_reseller_perms(perms)
+    await update.message.reply_text(f"✅ Permissions updated for reseller {target_id}.\nAllowed: {perms[target_id]}")
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_my_id))
     application.add_handler(CommandHandler("admin", admin_panel))
@@ -1781,6 +1836,7 @@ async def run_bot():
     application.add_handler(CommandHandler("remove_reseller", remove_reseller_cmd))
     application.add_handler(CommandHandler("resellers", list_resellers_cmd))
     application.add_handler(CommandHandler("rlogs", rlogs_cmd))
+    application.add_handler(CommandHandler("rperms", rperms_cmd))
     application.add_handler(CommandHandler("gen", gen_key_cmd))
     application.add_handler(CommandHandler("add_key", add_key))
     application.add_handler(CommandHandler("stock", check_stock))
