@@ -1460,6 +1460,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     save_keys(keys)
             
             if delivered_key:
+                resellers_check = load_resellers()
+                if user_id_str in resellers_check:
+                    username_str = f"@{query.from_user.username}" if query.from_user.username else str(query.from_user.first_name)
+                    log_reseller_action(username_str, user_id_str, product, delivered_key)
+                
                 success_msg = (
                     "✅ <b>PURCHASE SUCCESSFUL!</b>\n"
                     "━━━━━━━━━━━━━━━━━━\n"
@@ -1532,6 +1537,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 delivered_key = None
         
         if delivered_key:
+            resellers_check = load_resellers()
+            target_str = str(target_user_id)
+            if target_str in resellers_check:
+                # We don't have their username easily here, so we just use "Reseller"
+                log_reseller_action("Reseller", target_str, product, delivered_key)
+                
             # Send Key to User
             success_msg = (
                 "✅ <b>PAYMENT VERIFIED!</b>\n"
