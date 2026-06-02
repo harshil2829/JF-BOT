@@ -107,11 +107,11 @@ def load_reseller_logs():
     doc = jf_col.find_one({"_id": "reseller_logs"})
     return doc["data"] if doc else []
 
-def save_reseller_logs(user_id, product, key):
+def save_reseller_logs(username, user_id, product, key):
     logs = load_reseller_logs()
     from datetime import datetime
     time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logs.append(f"{time_str} - User {user_id} generated {product} key: {key}")
+    logs.append(f"{time_str} - {username} ({user_id}) gen {product}: {key}")
     if len(logs) > 50: logs = logs[-50:]
     jf_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
 
@@ -129,8 +129,8 @@ def load_reseller_perms():
 def save_reseller_perms(perms):
     with open("reseller_perms.json", "w") as f: json.dump(perms, f, indent=4)
 
-def log_reseller_action(user_id, product, duration_label):
-    save_reseller_logs(user_id, product, "N/A")
+def log_reseller_action(username, user_id, product, key):
+    save_reseller_logs(username, user_id, product, key)
 
 import os
 
@@ -683,63 +683,51 @@ def get_main_menu_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def get_shop_keyboard():
-    keyboard = [
-        [
-            InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"),
-            InlineKeyboardButton("LK TEAM", callback_data="product_lk")
-        ],
-        [
-            InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
-            InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha")
-        ],
-        [
-            InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
-            InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil")
-        ],
-        [
-            InlineKeyboardButton("BOOYAH MOD", callback_data="product_boyyah"),
-            InlineKeyboardButton("STREAMER X", callback_data="product_streamerx")
-        ],
-        [
-            InlineKeyboardButton("STREAMER-X PRO", callback_data="product_streamerpro"),
-            InlineKeyboardButton("NGO TRAN", callback_data="product_ngo")
-        ],
-        [
-            InlineKeyboardButton("GREED CHEAT", callback_data="product_greed"),
-            InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity")
-        ],
-        [
-            InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
-            InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam")
-        ],
-        [
-            InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
-            InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj")
-        ],
-        [
-            InlineKeyboardButton("VIPER TEAM", callback_data="product_viper"),
-            InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond")
-        ],
-        [
-            InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
-            InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk")
-        ],
-        [
-            InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
-            InlineKeyboardButton("ANGRY MOD", callback_data="product_angry")
-        ],
-        [
-            InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
-            InlineKeyboardButton("YOONSO BUTTERFLY", callback_data="product_yoonso")
-        ],
-        [InlineKeyboardButton("PRIME HOOK (.SH)", callback_data="product_primehook")],
-        [InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh")],
-        [InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure")],
-        [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra")],
-        [InlineKeyboardButton("OS VICTORY 8BP", callback_data="product_osvictory")],
-        [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+def get_shop_keyboard(user_id=None):
+    all_buttons = [
+        InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"),
+        InlineKeyboardButton("LK TEAM", callback_data="product_lk"),
+        InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
+        InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha"),
+        InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
+        InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
+        InlineKeyboardButton("BOOYAH MOD", callback_data="product_boyyah"),
+        InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
+        InlineKeyboardButton("STREAMER-X PRO", callback_data="product_streamerpro"),
+        InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
+        InlineKeyboardButton("GREED CHEAT", callback_data="product_greed"),
+        InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
+        InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
+        InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
+        InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
+        InlineKeyboardButton("VIPER TEAM", callback_data="product_viper"),
+        InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
+        InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
+        InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk"),
+        InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
+        InlineKeyboardButton("ANGRY MOD", callback_data="product_angry"),
+        InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
+        InlineKeyboardButton("YOONSO BUTTERFLY", callback_data="product_yoonso"),
+        InlineKeyboardButton("PRIME HOOK (.SH)", callback_data="product_primehook"),
+        InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
+        InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
+        InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
+        InlineKeyboardButton("OS VICTORY 8BP", callback_data="product_osvictory")
     ]
+    
+    if user_id:
+        resellers = load_resellers()
+        if str(user_id) in resellers:
+            perms = load_reseller_perms().get(str(user_id), [])
+            if not perms:
+                all_buttons = []
+            else:
+                all_buttons = [b for b in all_buttons if b.callback_data.replace("product_", "") in perms]
+                
+    keyboard = []
+    for i in range(0, len(all_buttons), 2):
+        keyboard.append(all_buttons[i:i+2])
+    keyboard.append([InlineKeyboardButton("« Main Menu", callback_data="main_menu")])
     return InlineKeyboardMarkup(keyboard)
 
 # --- ADMIN COMMANDS ---
@@ -896,7 +884,7 @@ async def rlogs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_id = str(context.args[0])
     logs = load_reseller_logs()
     
-    user_logs = [log for log in logs if f"User {target_id}" in log][-20:]
+    user_logs = [log for log in logs if f"({target_id})" in log][-20:]
     if not user_logs:
         await update.message.reply_text("❌ No activity found for this reseller.")
         return
@@ -942,7 +930,8 @@ async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_keys(keys)
             
     if delivered_key:
-        log_reseller_action(user_id, product, duration_label)
+        username = f"@{update.effective_user.username}" if update.effective_user.username else str(update.effective_user.first_name)
+        log_reseller_action(username, user_id, product, delivered_key)
         success_msg = (
             "✅ <b>RESELLER KEY GENERATED</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -1697,7 +1686,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("admin_seelog_"):
         target_id = data.split("_")[2]
         logs = load_reseller_logs()
-        user_logs = [log for log in logs if f"User {target_id}" in log][-20:]
+        user_logs = [log for log in logs if f"({target_id})" in log][-20:]
         if not user_logs:
             kb = [[InlineKeyboardButton("« Back", callback_data="admin_logsmode")]]; await query.edit_message_text("❌ No activity found for this reseller.", reply_markup=InlineKeyboardMarkup(kb))
             return
@@ -1817,7 +1806,7 @@ async def rperms_cmd(update, context):
     if perms_str.lower() == "clear":
         perms[target_id] = []
     else:
-        perms[target_id] = perms_str.split(",")
+        perms[target_id] = [p.strip() for p in perms_str.split(",")]
     save_reseller_perms(perms)
     await update.message.reply_text(f"✅ Permissions updated for reseller {target_id}.\nAllowed: {perms[target_id]}")
 
