@@ -89,6 +89,12 @@ def save_utr(utr):
         log.append(utr)
         jf_col.update_one({"_id": "utr_log"}, {"$set": {"data": log}}, upsert=True)
 
+def debug_log(msg):
+    logs = jf_col.find_one({"_id": "debug_logs"})
+    data = logs["data"] if logs else []
+    data.append(msg)
+    jf_col.update_one({"_id": "debug_logs"}, {"$set": {"data": data[-100:]}}, upsert=True)
+
 def load_balances():
     doc = jf_col.find_one({"_id": "balances"})
     return doc["data"] if doc else {}
@@ -1434,6 +1440,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
 
     elif data.startswith("walletpay_"):
+        debug_log(f"Clicked walletpay: {data}")
         order_id = data.split("_")[1]
         amount = float(context.user_data.get("amount", "0"))
         product = context.user_data.get("product", "hxn")
@@ -1443,7 +1450,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         balances = load_balances()
         user_bal = balances.get(user_id_str, 0.0)
         
+        debug_log(f"user_bal: {user_bal}, amount: {amount}")
         if user_bal >= amount:
+            debug_log("Sufficient balance")
             balances[user_id_str] -= amount
             save_balances(balances)
             
@@ -1459,11 +1468,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     delivered_key = keys[dict_key].pop(0)
                     save_keys(keys)
             
+            debug_log(f"Delivered key: {delivered_key}")
             if delivered_key:
                 resellers_check = load_resellers()
                 if user_id_str in resellers_check:
                     username_str = f"@{query.from_user.username}" if query.from_user.username else str(query.from_user.first_name)
+                    debug_log("Calling log_reseller_action")
                     log_reseller_action(username_str, user_id_str, product, delivered_key)
+                    debug_log("log_reseller_action finished")
                 
                 success_msg = (
                     "✅ <b>PURCHASE SUCCESSFUL!</b>\n"
@@ -1475,7 +1487,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                     "<i>Thank you for shopping with us!</i>"
                 )
+                debug_log("Editing success msg")
                 await query.edit_message_text(text=success_msg, parse_mode="HTML")
+                debug_log("Edited success msg")
             else:
                 balances[user_id_str] += amount
                 save_balances(balances)
