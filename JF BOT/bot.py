@@ -122,18 +122,18 @@ def save_reseller_logs(username, user_id, product, key):
     jf_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
 
 def load_referrals():
-    if not os.path.exists("referrals.json"): return {}
-    with open("referrals.json", "r") as f: return json.load(f)
+    doc = jf_col.find_one({"_id": "referrals"})
+    return doc["data"] if doc else {}
 
 def save_referrals(refs):
-    with open("referrals.json", "w") as f: json.dump(refs, f, indent=4)
+    jf_col.update_one({"_id": "referrals"}, {"$set": {"data": refs}}, upsert=True)
 
 def load_reseller_perms():
-    if not os.path.exists("reseller_perms.json"): return {}
-    with open("reseller_perms.json", "r") as f: return json.load(f)
+    doc = jf_col.find_one({"_id": "reseller_perms"})
+    return doc["data"] if doc else {}
 
 def save_reseller_perms(perms):
-    with open("reseller_perms.json", "w") as f: json.dump(perms, f, indent=4)
+    jf_col.update_one({"_id": "reseller_perms"}, {"$set": {"data": perms}}, upsert=True)
 
 def log_reseller_action(username, user_id, product, key):
     save_reseller_logs(username, user_id, product, key)
@@ -781,6 +781,28 @@ async def set_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings["welcome_text"] = new_text
     save_settings(settings)
     await update.message.reply_text("✅ <b>Welcome message updated!</b>", parse_mode="HTML")
+
+async def remove_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /remove_balance [user_id] [amount]")
+        return
+    
+    target_id = context.args[0]
+    try: amount = float(context.args[1])
+    except: return await update.message.reply_text("Invalid amount.")
+    
+    balances = load_balances()
+    current = balances.get(target_id, 0.0)
+    balances[target_id] = max(0.0, current - amount)
+    save_balances(balances)
+    
+    await update.message.reply_text(f"✅ Removed ₹{amount} from user {target_id}. New Balance: ₹{balances[target_id]}")
+    try:
+        await context.bot.send_message(chat_id=target_id, text=f"💰 <b>Admin removed ₹{amount} from your wallet.</b>\nNew Balance: ₹{balances[target_id]}", parse_mode="HTML")
+    except: pass
 
 async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1846,6 +1868,7 @@ async def run_bot():
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
+    application.add_handler(CommandHandler("remove_balance", remove_balance_cmd))
     application.add_handler(CommandHandler("add_reseller", add_reseller_cmd))
     application.add_handler(CommandHandler("remove_reseller", remove_reseller_cmd))
     application.add_handler(CommandHandler("resellers", list_resellers_cmd))
