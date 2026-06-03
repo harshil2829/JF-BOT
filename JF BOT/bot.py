@@ -137,6 +137,22 @@ def load_reseller_perms():
 def save_reseller_perms(perms):
     jf_col.update_one({"_id": "reseller_perms"}, {"$set": {"data": perms}}, upsert=True)
 
+
+def load_user_history(user_id):
+    doc = jf_col.find_one({"_id": f"history_{user_id}"})
+    if doc and isinstance(doc.get("data"), list):
+        return doc["data"]
+    return []
+
+def log_user_action(user_id, product, key):
+    from datetime import datetime
+    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_str = f"• {time_str}\n🏺 {product.upper()}\n🔑 <code>{key}</code>\n"
+    logs = load_user_history(user_id)
+    logs.append(log_str)
+    if len(logs) > 50: logs = logs[-50:]
+    jf_col.update_one({"_id": f"history_{user_id}"}, {"$set": {"data": logs}}, upsert=True)
+
 def log_reseller_action(username, user_id, product, key):
     save_reseller_logs(username, user_id, product, key)
 
@@ -708,14 +724,11 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
         InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
         InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
-        InlineKeyboardButton("VIPER TEAM", callback_data="product_viper"),
+        InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
         InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
         InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
         InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk"),
-        InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
-        InlineKeyboardButton("ANGRY MOD", callback_data="product_angry"),
         InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
-        InlineKeyboardButton("YOONSO BUTTERFLY", callback_data="product_yoonso"),
         InlineKeyboardButton("PRIME HOOK (.SH)", callback_data="product_primehook"),
         InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
         InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
@@ -1185,11 +1198,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("GREED", callback_data="bulk_prod_greed"), InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="bulk_prod_primehook")],
             [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
             [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
-            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("VIPER", callback_data="bulk_prod_viper")],
+            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj")],
             [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
             [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
-            [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("ANGRY MOD", callback_data="bulk_prod_angry")],
-            [InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid"), InlineKeyboardButton("YOONSO", callback_data="bulk_prod_yoonso")],
+            [InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
             [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure")],
             [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
             [InlineKeyboardButton("OS VICTORY 8BP", callback_data="bulk_prod_osvictory")],
@@ -1270,26 +1282,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif data == "add_balance":
-        await query.edit_message_text(
+        text = (
             "💰 <b>ADD BALANCE</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "To add funds to your wallet, please select an amount or use the QR scanner in the payment section.\n\n"
             "1. Click 'Shop Store Now'\n"
             "2. Select any product\n"
             "3. Pay the exact amount\n\n"
-            "<i>Balance will be added automatically after verification.</i>",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛍️ Go to Shop", callback_data="shop")], [InlineKeyboardButton("« Back", callback_data="main_menu")]]),
-            parse_mode="HTML"
+            "<i>Balance will be added automatically after verification.</i>"
         )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🛍️ Go to Shop", callback_data="shop")], [InlineKeyboardButton("« Back", callback_data="main_menu")]])
+        import os
+        if os.path.exists("qr.png"):
+            await context.bot.send_photo(chat_id=query.message.chat_id, photo=open("qr.png", "rb"), caption=text, reply_markup=keyboard, parse_mode="HTML")
+            await query.message.delete()
+        else:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
     elif data == "history":
-        await query.edit_message_text(
-            "📋 <b>ORDER HISTORY</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "❌ <b>No orders found!</b>\n\n"
-            "Your previous purchases will appear here once they are verified.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
-            parse_mode="HTML"
-        )
+        logs = load_user_history(query.from_user.id)
+        if logs:
+            history_text = "\n".join(logs[-10:])
+            text = f"📋 <b>YOUR ORDER HISTORY</b>\n━━━━━━━━━━━━━━━━━━\n{history_text}\n<i>Showing your last 10 purchases.</i>"
+        else:
+            text = (
+                "📋 <b>ORDER HISTORY</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "❌ <b>No orders found!</b>\n\n"
+                "Your previous purchases will appear here once they are verified."
+            )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]), parse_mode="HTML")
     elif data == "referral":
         bot_username = (await context.bot.get_me()).username
         referral_link = f"https://t.me/{bot_username}?start={update.effective_user.id}"
@@ -1528,7 +1549,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"💰 <b>Remaining Balance:</b> ₹{balances[user_id_str]:.2f}\n"
                         "━━━━━━━━━━━━━━━━━━\n"
                         f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
-                        "<i>Thank you for shopping with us!</i>"
+                        "<i>Thank you for shopping with us!</i>\n\n"
+                        "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
                     )
                     debug_log("Editing success msg")
                     await query.edit_message_text(text=success_msg, parse_mode="HTML")
@@ -1603,6 +1625,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if target_str in resellers_check:
                 # We don't have their username easily here, so we just use "Reseller"
                 log_reseller_action("Reseller", target_str, product, delivered_key)
+            log_user_action(target_user_id, product, delivered_key)
                 
             # Send Key to User
             success_msg = (
@@ -1613,7 +1636,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
-                "<i>Thank you for shopping with us!</i>"
+                "<i>Thank you for shopping with us!</i>\n\n"
+                "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
             )
             try:
                 await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
