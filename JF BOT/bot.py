@@ -1149,10 +1149,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "trial_key":
         settings = load_settings()
         if settings.get("trial_locked", False):
-            msg = ("🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
-                   "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
-                   "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
-                   "<b>OR DEVLOPER :-</b>@rajput_harshil")
+            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@JFHAXX01\n<b>OR DEVLOPER :-</b>@rajput_harshil")
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
@@ -1169,10 +1166,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("claim_trial_"):
         settings = load_settings()
         if settings.get("trial_locked", False):
-            msg = ("🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
-                   "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
-                   "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
-                   "<b>OR DEVLOPER :-</b>@rajput_harshil")
+            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@JFHAXX01\n<b>OR DEVLOPER :-</b>@rajput_harshil")
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
@@ -1985,8 +1979,20 @@ async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     if update.effective_user.id not in settings["admin_ids"]: return
     settings["trial_locked"] = True
+    
+    custom_msg = " ".join(context.args) if context.args else None
+    if custom_msg:
+        settings["trial_locked_msg"] = custom_msg
+    else:
+        settings["trial_locked_msg"] = (
+            "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
+            "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
+            "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
+            "<b>OR DEVLOPER :-</b>@rajput_harshil"
+        )
+        
     save_settings(settings)
-    await update.message.reply_text("🔒 Trial Key Section Locked!")
+    await update.message.reply_text("🔒 Trial Key Section Locked!\nUsage: /lock_trial [optional custom message]")
 
 async def unlock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
