@@ -1183,6 +1183,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product = data.split("_")[2]
         user_id = str(update.effective_user.id)
         
+        locked_products = settings.get("locked_products", {})
+        if product in locked_products:
+            msg = locked_products[product]
+            kb = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
+            await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            return
+            
         # Check channel
         if not await check_force_sub(update.effective_user.id, context):
             await query.answer("⚠️ You must join the channel first!", show_alert=True)
@@ -2025,28 +2032,63 @@ async def reset_trial(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     if update.effective_user.id not in settings["admin_ids"]: return
-    settings["trial_locked"] = True
     
-    custom_msg = " ".join(context.args) if context.args else None
-    if custom_msg:
-        settings["trial_locked_msg"] = custom_msg
-    else:
+    known_products = ["hxn", "lk", "hex", "alpha", "boyyah", "ngo", "greed", "streamerx", "brmods"]
+    
+    if not context.args:
+        settings["trial_locked"] = True
         settings["trial_locked_msg"] = (
             "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
             "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
             "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
             "<b>OR DEVLOPER :-</b>@rajput_harshil"
         )
+        save_settings(settings)
+        await update.message.reply_text("🔒 All Trial Keys Locked!\nUsage: /lock_trial [optional: product] [optional: custom message]\nValid products: " + ", ".join(known_products))
+        return
         
-    save_settings(settings)
-    await update.message.reply_text("🔒 Trial Key Section Locked!\nUsage: /lock_trial [optional custom message]")
+    first_arg = context.args[0].lower()
+    if first_arg in known_products:
+        if "locked_products" not in settings or not isinstance(settings["locked_products"], dict):
+            settings["locked_products"] = {}
+            
+        custom_msg = " ".join(context.args[1:]) if len(context.args) > 1 else None
+        if not custom_msg:
+            custom_msg = (
+                f"🚫 <b>{first_arg.upper()} TRIAL LOCKED</b> 🚫\n\n"
+                "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
+                "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
+                "<b>OR DEVLOPER :-</b>@rajput_harshil"
+            )
+            
+        settings["locked_products"][first_arg] = custom_msg
+        save_settings(settings)
+        await update.message.reply_text(f"🔒 Trial Keys for '{first_arg.upper()}' Locked!")
+    else:
+        settings["trial_locked"] = True
+        settings["trial_locked_msg"] = " ".join(context.args)
+        save_settings(settings)
+        await update.message.reply_text("🔒 All Trial Keys Locked with custom message!")
 
 async def unlock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     if update.effective_user.id not in settings["admin_ids"]: return
-    settings["trial_locked"] = False
-    save_settings(settings)
-    await update.message.reply_text("🔓 Trial Key Section Unlocked!")
+    
+    if not context.args:
+        settings["trial_locked"] = False
+        settings["locked_products"] = {}
+        save_settings(settings)
+        await update.message.reply_text("🔓 All Trial Keys Unlocked!")
+    else:
+        first_arg = context.args[0].lower()
+        if "locked_products" in settings and first_arg in settings["locked_products"]:
+            del settings["locked_products"][first_arg]
+            save_settings(settings)
+            await update.message.reply_text(f"🔓 Trial Keys for '{first_arg.upper()}' Unlocked!")
+        else:
+            settings["trial_locked"] = False
+            save_settings(settings)
+            await update.message.reply_text(f"🔓 Global Trial lock removed! (If a specific mod was locked, use /unlock_trial [product])")
 
 async def rperms_cmd(update, context):
     user_id = update.effective_user.id
