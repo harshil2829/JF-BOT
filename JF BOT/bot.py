@@ -444,7 +444,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 save_referrals(refs)
                 
                 bals = load_balances()
-                bals[int(referrer_id)] = bals.get(int(referrer_id), 0) + 10
+                bals[str(referrer_id)] = bals.get(str(referrer_id), 0.0) + 10.0
                 save_balances(bals)
                 
                 try:
