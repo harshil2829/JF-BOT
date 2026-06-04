@@ -522,36 +522,39 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     
     if state == "awaiting_balance_amount":
-        try:
-            amount = float(update.message.text.strip())
-            if amount <= 0:
-                raise ValueError
-        except:
-            await update.message.reply_text("❌ Please enter a valid positive number.")
-            return
-            
-        context.user_data["state"] = None
-        context.user_data["balance_amount"] = amount
-        import uuid
-        order_id = str(uuid.uuid4().hex)[:8]
-        
-        reply_text = (
-            "💰 <b>ADD BALANCE REQUEST</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
-            f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-            "<i>Scan the QR code below to pay, then click '✅ I Have Paid'.</i>"
-        )
-        keyboard = [
-            [InlineKeyboardButton("✅ I Have Paid", callback_data=f"balconfirm_{order_id}_{amount}")],
-            [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
-        ]
-        import os
-        if os.path.exists("qr.png"):
-            await update.message.reply_photo(photo=open("qr.png", "rb"), caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        if update.message.text in ["👑 Admin Panel", "/start", "/help", "cancel"]:
+            context.user_data["state"] = None
         else:
-            await update.message.reply_text(reply_text + "\n\n⚠️ <i>(QR Code missing)</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-        return
+            try:
+                amount = float(update.message.text.strip())
+                if amount <= 0:
+                    raise ValueError
+                
+                context.user_data["state"] = None
+                context.user_data["balance_amount"] = amount
+                import uuid
+                order_id = str(uuid.uuid4().hex)[:8]
+                
+                reply_text = (
+                    "💰 <b>ADD BALANCE REQUEST</b>\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
+                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+                    "<i>Scan the QR code below to pay, then click '✅ I Have Paid'.</i>"
+                )
+                keyboard = [
+                    [InlineKeyboardButton("✅ I Have Paid", callback_data=f"balconfirm_{order_id}_{amount}")],
+                    [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
+                ]
+                import os
+                if os.path.exists("qr.png"):
+                    await update.message.reply_photo(photo=open("qr.png", "rb"), caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+                else:
+                    await update.message.reply_text(reply_text + "\n\n⚠️ <i>(QR Code missing)</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+                return
+            except:
+                await update.message.reply_text("❌ Please enter a valid positive number.")
+                return
 
     if state == "awaiting_bulk_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
