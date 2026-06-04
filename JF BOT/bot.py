@@ -861,7 +861,7 @@ async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
         
     if not context.args:
-        await update.message.reply_text("Usage: /set_trial_days [number of days]")
+        await update.message.reply_text("Usage: /set_trial_days [number of days] [optional: product_name]\nExample: /set_trial_days 1\nExample: /set_trial_days 1 brmods")
         return
         
     try:
@@ -872,9 +872,18 @@ async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("Please provide a valid positive number.")
         return
         
-    settings["trial_cooldown_days"] = days
-    save_settings(settings)
-    await update.message.reply_text(f"✅ Trial key cooldown has been set to {days} days.")
+    if "trial_cooldowns" not in settings or not isinstance(settings["trial_cooldowns"], dict):
+        settings["trial_cooldowns"] = {}
+        
+    if len(context.args) > 1:
+        product_name = context.args[1].lower()
+        settings["trial_cooldowns"][product_name] = days
+        save_settings(settings)
+        await update.message.reply_text(f"✅ Trial key cooldown for '{product_name.upper()}' has been set to {days} days.")
+    else:
+        settings["trial_cooldowns"]["default"] = days
+        save_settings(settings)
+        await update.message.reply_text(f"✅ Global Trial key cooldown has been set to {days} days.")
 
 async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1182,18 +1191,46 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trials = load_trials()
         user_trial = trials.get(user_id, {"last_trial": 0, "strikes": 0, "banned": False})
         
-        # 2 day check
-        cooldown_time = 24 * 60 * 60
-        time_since_last = time.time() - user_trial["last_trial"]
+        # Determine cooldown time for this product
+        settings = load_settings()
+        trial_cooldowns = settings.get("trial_cooldowns", {})
+        
+        if product in trial_cooldowns:
+            cooldown_days = float(trial_cooldowns[product])
+        elif "default" in trial_cooldowns:
+            cooldown_days = float(trial_cooldowns["default"])
+        else:
+            cooldown_days = float(settings.get("trial_cooldown_days", 1.0))
+            
+        cooldown_time = cooldown_days * 24 * 60 * 60
+        
+        # Check specific product history if available, else global
+        product_last_trial = 0
+        if "history" in user_trial and product in user_trial["history"]:
+            product_last_trial = user_trial["history"][product].get("last_trial", 0)
+        elif user_trial.get("last_product", "").lower() == product:
+            product_last_trial = user_trial.get("last_trial", 0)
+        elif "history" not in user_trial:
+            # Backward compatibility: if they claimed something recently but we don't know what
+            # enforce global cooldown to prevent spamming right after update.
+            product_last_trial = user_trial.get("last_trial", 0)
+            
+        time_since_last = time.time() - product_last_trial
+        
         if time_since_last < cooldown_time:
             remaining_seconds = int(cooldown_time - time_since_last)
             h, remainder = divmod(remaining_seconds, 3600)
             m, s = divmod(remainder, 60)
             keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
-            last_key = user_trial.get("last_key", "None")
-            last_prod = user_trial.get("last_product", "Unknown").upper()
             
-            msg = f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next trial key after this time."
+            last_key = "None"
+            last_prod = product.upper()
+            if "history" in user_trial and product in user_trial["history"]:
+                last_key = user_trial["history"][product].get("last_key", "None")
+            elif user_trial.get("last_product", "").lower() == product:
+                last_key = user_trial.get("last_key", "None")
+                
+            msg = f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next {last_prod} trial key after this time."
             if last_key != "None":
                 msg += f"\n\n🔑 <b>Your Last Key ({last_prod}):</b>\n<code>{last_key}</code>"
                 
@@ -1215,6 +1252,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_trial["last_trial"] = time.time()
             user_trial["last_key"] = delivered_key
             user_trial["last_product"] = product.upper()
+            
+            if "history" not in user_trial:
+                user_trial["history"] = {}
+            user_trial["history"][product] = {
+                "last_trial": time.time(),
+                "last_key": delivered_key
+            }
+            
             trials[user_id] = user_trial
             save_trials(trials)
             
@@ -1964,8 +2009,10 @@ async def reset_trial(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trials = load_trials()
     if target_id in trials:
         trials[target_id]["last_trial"] = 0
+        if "history" in trials[target_id]:
+            trials[target_id]["history"] = {}
     else:
-        trials[target_id] = {"last_trial": 0, "strikes": 0, "banned": False}
+        trials[target_id] = {"last_trial": 0, "strikes": 0, "banned": False, "history": {}}
         
     save_trials(trials)
     
