@@ -521,6 +521,38 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     
     
+    if state == "awaiting_balance_amount":
+        try:
+            amount = float(update.message.text.strip())
+            if amount <= 0:
+                raise ValueError
+        except:
+            await update.message.reply_text("❌ Please enter a valid positive number.")
+            return
+            
+        context.user_data["state"] = None
+        context.user_data["balance_amount"] = amount
+        import uuid
+        order_id = str(uuid.uuid4().hex)[:8]
+        
+        reply_text = (
+            "💰 <b>ADD BALANCE REQUEST</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
+            f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+            "<i>Scan the QR code below to pay, then click '✅ I Have Paid'.</i>"
+        )
+        keyboard = [
+            [InlineKeyboardButton("✅ I Have Paid", callback_data=f"balconfirm_{order_id}_{amount}")],
+            [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
+        ]
+        import os
+        if os.path.exists("qr.png"):
+            await update.message.reply_photo(photo=open("qr.png", "rb"), caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        else:
+            await update.message.reply_text(reply_text + "\n\n⚠️ <i>(QR Code missing)</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        return
+
     if state == "awaiting_bulk_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
         product = context.user_data.get("bulk_product")
@@ -717,7 +749,7 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
         InlineKeyboardButton("BOOYAH MOD", callback_data="product_boyyah"),
         InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
-        InlineKeyboardButton("STREAMER-X PRO", callback_data="product_streamerpro"),
+        InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro"),
         InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
         InlineKeyboardButton("GREED CHEAT", callback_data="product_greed"),
         InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
@@ -729,7 +761,7 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
         InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk"),
         InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
-        InlineKeyboardButton("PRIME HOOK (.SH)", callback_data="product_primehook"),
+        InlineKeyboardButton("DAEMON PHONK", callback_data="product_daemon"),
         InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
         InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
         InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
@@ -818,6 +850,28 @@ async def remove_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         await context.bot.send_message(chat_id=target_id, text=f"💰 <b>Admin removed ₹{amount} from your wallet.</b>\nNew Balance: ₹{balances[target_id]}", parse_mode="HTML")
     except: pass
+
+
+async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]:
+        return
+        
+    if not context.args:
+        await update.message.reply_text("Usage: /set_trial_days [number of days]")
+        return
+        
+    try:
+        days = float(context.args[0])
+        if days < 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("Please provide a valid positive number.")
+        return
+        
+    settings["trial_cooldown_days"] = days
+    save_settings(settings)
+    await update.message.reply_text(f"✅ Trial key cooldown has been set to {days} days.")
 
 async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1201,6 +1255,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj")],
             [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
             [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
+            [InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro"), InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon")],
             [InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
             [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure")],
             [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
@@ -1282,22 +1337,70 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif data == "add_balance":
-        text = (
-            "💰 <b>ADD BALANCE</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "To add funds to your wallet, please select an amount or use the QR scanner in the payment section.\n\n"
-            "1. Click 'Shop Store Now'\n"
-            "2. Select any product\n"
-            "3. Pay the exact amount\n\n"
-            "<i>Balance will be added automatically after verification.</i>"
-        )
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🛍️ Go to Shop", callback_data="shop")], [InlineKeyboardButton("« Back", callback_data="main_menu")]])
-        import os
-        if os.path.exists("qr.png"):
-            await context.bot.send_photo(chat_id=query.message.chat_id, photo=open("qr.png", "rb"), caption=text, reply_markup=keyboard, parse_mode="HTML")
+        context.user_data["state"] = "awaiting_balance_amount"
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]])
+        if query.message.photo:
             await query.message.delete()
+            await context.bot.send_message(chat_id=query.message.chat_id, text="💰 <b>ADD BALANCE</b>\n━━━━━━━━━━━━━━━━━━\nPlease type the amount you want to add to your wallet in INR (₹).", reply_markup=keyboard, parse_mode="HTML")
         else:
-            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
+            await query.edit_message_text(
+                "💰 <b>ADD BALANCE</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "Please type the amount you want to add to your wallet in INR (₹).",
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            
+    elif data.startswith("balconfirm_"):
+        parts = data.split("_")
+        order_id = parts[1]
+        amount = float(parts[2])
+        username = f"@{query.from_user.username}" if query.from_user.username else query.from_user.first_name
+        user_id = query.from_user.id
+        
+        settings = load_settings()
+        for admin_id in settings.get("admin_ids", []):
+            try:
+                msg = (
+                    "💰 <b>NEW BALANCE REQUEST</b>\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    f"👤 <b>User:</b> {username} (<code>{user_id}</code>)\n"
+                    f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
+                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+                    "<i>Please verify the payment and add balance.</i>"
+                )
+                kb = [[InlineKeyboardButton("✅ Approve", callback_data=f"balapp_{user_id}_{amount}"), InlineKeyboardButton("❌ Reject", callback_data=f"balrej_{user_id}")]]
+                await context.bot.send_message(chat_id=admin_id, text=msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+            except:
+                pass
+                
+        await query.edit_message_caption(caption="✅ <b>Request Sent!</b>\n━━━━━━━━━━━━━━━━━━\nThe admin has been notified. Your balance will be added once the payment is verified.", parse_mode="HTML") if query.message.photo else await query.edit_message_text(text="✅ <b>Request Sent!</b>\n━━━━━━━━━━━━━━━━━━\nThe admin has been notified. Your balance will be added once the payment is verified.", parse_mode="HTML")
+
+    elif data.startswith("balapp_"):
+        if update.effective_user.id not in settings.get("admin_ids", []): return
+        parts = data.split("_")
+        user_id = parts[1]
+        amount = float(parts[2])
+        
+        balances = load_balances()
+        balances[user_id] = balances.get(user_id, 0.0) + amount
+        save_balances(balances)
+        
+        try:
+            await context.bot.send_message(chat_id=user_id, text=f"✅ <b>BALANCE ADDED!</b>\n━━━━━━━━━━━━━━━━━━\n₹{amount:.2f} has been added to your wallet.\n💰 <b>New Balance:</b> ₹{balances[user_id]:.2f}", parse_mode="HTML")
+        except:
+            pass
+            
+        await query.edit_message_text(query.message.text + f"\n\n✅ <b>APPROVED</b>\nAdded ₹{amount:.2f} to {user_id}", parse_mode="HTML")
+        
+    elif data.startswith("balrej_"):
+        if update.effective_user.id not in settings.get("admin_ids", []): return
+        user_id = data.split("_")[1]
+        try:
+            await context.bot.send_message(chat_id=user_id, text="❌ <b>BALANCE REQUEST REJECTED</b>\n━━━━━━━━━━━━━━━━━━\nYour payment could not be verified. Please contact support.", parse_mode="HTML")
+        except:
+            pass
+        await query.edit_message_text(query.message.text + "\n\n❌ <b>REJECTED</b>", parse_mode="HTML")
     elif data == "history":
         logs = load_user_history(query.from_user.id)
         if logs:
@@ -1917,6 +2020,7 @@ async def run_bot():
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
+    application.add_handler(CommandHandler("set_trial_days", set_trial_days_cmd))
     application.add_handler(CommandHandler("remove_balance", remove_balance_cmd))
     application.add_handler(CommandHandler("add_reseller", add_reseller_cmd))
     application.add_handler(CommandHandler("remove_reseller", remove_reseller_cmd))
