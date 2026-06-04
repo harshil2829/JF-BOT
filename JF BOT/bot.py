@@ -885,6 +885,20 @@ async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         save_settings(settings)
         await update.message.reply_text(f"✅ Global Trial key cooldown has been set to {days} days.")
 
+async def check_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    if len(context.args) < 1:
+        await update.message.reply_text("Usage: /check_balance [user_id]")
+        return
+        
+    target_id = str(context.args[0])
+    balances = load_balances()
+    current = balances.get(target_id, 0.0)
+    await update.message.reply_text(f"💰 Balance for user {target_id}: ₹{current:.2f}")
+
 async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -2118,6 +2132,7 @@ async def run_bot():
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
+    application.add_handler(CommandHandler("check_balance", check_balance_cmd))
     application.add_handler(CommandHandler("set_trial_days", set_trial_days_cmd))
     application.add_handler(CommandHandler("remove_balance", remove_balance_cmd))
     application.add_handler(CommandHandler("add_reseller", add_reseller_cmd))
