@@ -1469,7 +1469,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🛒 <b>{product_name}</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📦 <b>Package Info:</b>\n"
-            "┠ <b>1 DAY : ₹70</b> - 81 stock\n"
+            "┠ <b>1 DAY : ₹50</b> - 81 stock\n"
             "✅ <b>Stock Available</b>\n\n"
             "┠ <b>7 DAY : ₹200</b> - 4 stock\n"
             "✅ <b>Stock Available</b>\n\n"
@@ -1482,7 +1482,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         keyboard = [
-            [InlineKeyboardButton("🛒 1 Day - ₹70", callback_data=f"buy_{data}_1d")],
+            [InlineKeyboardButton("🛒 1 Day - ₹50", callback_data=f"buy_{data}_1d")],
             [InlineKeyboardButton("🛒 7 Day - ₹200", callback_data=f"buy_{data}_7d")],
             [InlineKeyboardButton("🛒 15 Day - ₹400", callback_data=f"buy_{data}_15d")],
             [InlineKeyboardButton("🛒 30 Day - ₹600", callback_data=f"buy_{data}_30d")],
@@ -1500,7 +1500,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duration = parts[3]
         
         duration_map = {"1d": "1 Days", "7d": "7 Days", "15d": "15 Days", "30d": "30 Days"}
-        price_map = {"1d": "70.00", "7d": "200.00", "15d": "400.00", "30d": "600.00"}
+        price_map = {"1d": "50.00", "7d": "200.00", "15d": "400.00", "30d": "600.00"}
         
         product_name = product_key.upper()
         days = duration_map.get(duration, duration)
