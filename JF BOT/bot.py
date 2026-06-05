@@ -915,6 +915,28 @@ async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_trials(trials)
     await update.message.reply_text(f"✅ User {target_id} has been UNBANNED and strikes reset to 0.")
 
+async def check_history_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings.get("admin_ids", []): return
+    if len(context.args) < 1:
+        await update.message.reply_text("Usage: /check_history [user_id]")
+        return
+        
+    target_id = str(context.args[0])
+    logs = load_user_history(target_id)
+    
+    if not logs:
+        await update.message.reply_text(f"❌ No history found for user {target_id}.")
+        return
+        
+    history_text = "\n".join(logs[-20:])
+    text = f"📋 <b>ORDER HISTORY: {target_id}</b>\n━━━━━━━━━━━━━━━━━━\n{history_text}\n<i>Showing the last 20 purchases.</i>"
+    
+    if len(text) > 4096:
+        text = text[:4000] + "... [TRUNCATED]"
+        
+    await update.message.reply_text(text, parse_mode="HTML")
+
 async def check_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -2160,6 +2182,7 @@ async def run_bot():
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
     application.add_handler(CommandHandler("ban", ban_cmd))
     application.add_handler(CommandHandler("unban", unban_cmd))
+    application.add_handler(CommandHandler("check_history", check_history_cmd))
     application.add_handler(CommandHandler("check_balance", check_balance_cmd))
     application.add_handler(CommandHandler("set_trial_days", set_trial_days_cmd))
     application.add_handler(CommandHandler("remove_balance", remove_balance_cmd))
