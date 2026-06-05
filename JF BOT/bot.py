@@ -29,21 +29,51 @@ TOKEN = "7994962595:AAGOZdezJAetEVJPCpbOVqAds7AYaypWlRY"
 UPI_GATEWAY_TOKEN = "7994962595:AAGOZdezJAetEVJPCpbOVqAds7AYaypWlRY" 
 IS_AUTO_MODE = False
 
+import time
+_CACHE = {}
+_CACHE_TTL = 10 # 10 seconds TTL to drastically reduce DB load
 
+def get_cached(key, default):
+    now = time.time()
+    if key in _CACHE:
+        data, ts = _CACHE[key]
+        if now - ts < _CACHE_TTL:
+            return data
+    doc = jf_col.find_one({"_id": key})
+    if doc and "data" in doc:
+        data = doc["data"]
+    else:
+        data = default
+    _CACHE[key] = (data, now)
+    return data
+
+def set_cached(key, data):
+    _CACHE[key] = (data, time.time())
+    jf_col.update_one({"_id": key}, {"$set": {"data": data}}, upsert=True)
 
 def load_settings():
-    doc = jf_col.find_one({"_id": "settings"})
-    return doc["data"] if doc else {"admin_ids": [12345678]}
+    return get_cached("settings", {"admin_ids": [12345678]})
 
 def save_settings(settings):
-    jf_col.update_one({"_id": "settings"}, {"$set": {"data": settings}}, upsert=True)
+    set_cached("settings", settings)
 
 def load_trials():
-    doc = jf_col.find_one({"_id": "trials"})
-    return doc["data"] if doc else {}
+    return get_cached("trials", {})
 
 def save_trials(data):
-    jf_col.update_one({"_id": "trials"}, {"$set": {"data": data}}, upsert=True)
+    set_cached("trials", data)
+
+def load_balances():
+    return get_cached("balances", {})
+
+def save_balances(balances):
+    set_cached("balances", balances)
+
+def load_keys():
+    return get_cached("keys", {})
+
+def save_keys(keys):
+    set_cached("keys", keys)
 
 def load_users():
     doc = jf_col.find_one({"_id": "users"})
@@ -72,13 +102,6 @@ def save_verified_user(user_id):
         verified.append(user_id)
         jf_col.update_one({"_id": "verified_users"}, {"$set": {"data": verified}}, upsert=True)
 
-def load_keys():
-    doc = jf_col.find_one({"_id": "keys"})
-    return doc["data"] if doc else {}
-
-def save_keys(keys):
-    jf_col.update_one({"_id": "keys"}, {"$set": {"data": keys}}, upsert=True)
-
 def load_utr_log():
     doc = jf_col.find_one({"_id": "utr_log"})
     return doc["data"] if doc else []
@@ -94,13 +117,6 @@ def debug_log(msg):
     data = logs["data"] if logs else []
     data.append(msg)
     jf_col.update_one({"_id": "debug_logs"}, {"$set": {"data": data[-100:]}}, upsert=True)
-
-def load_balances():
-    doc = jf_col.find_one({"_id": "balances"})
-    return doc["data"] if doc else {}
-
-def save_balances(balances):
-    jf_col.update_one({"_id": "balances"}, {"$set": {"data": balances}}, upsert=True)
 
 def load_resellers():
     doc = jf_col.find_one({"_id": "resellers"})
