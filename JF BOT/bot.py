@@ -885,6 +885,36 @@ async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         save_settings(settings)
         await update.message.reply_text(f"✅ Global Trial key cooldown has been set to {days} days.")
 
+async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]: return
+    if len(context.args) < 1:
+        await update.message.reply_text("Usage: /ban [user_id]")
+        return
+    
+    target_id = str(context.args[0])
+    trials = load_trials()
+    if target_id not in trials:
+        trials[target_id] = {"last_trial": 0, "strikes": 0, "history": {}}
+    trials[target_id]["banned"] = True
+    save_trials(trials)
+    await update.message.reply_text(f"✅ User {target_id} has been BANNED.")
+
+async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]: return
+    if len(context.args) < 1:
+        await update.message.reply_text("Usage: /unban [user_id]")
+        return
+    
+    target_id = str(context.args[0])
+    trials = load_trials()
+    if target_id in trials:
+        trials[target_id]["banned"] = False
+        trials[target_id]["strikes"] = 0
+        save_trials(trials)
+    await update.message.reply_text(f"✅ User {target_id} has been UNBANNED and strikes reset to 0.")
+
 async def check_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -2128,6 +2158,8 @@ async def run_bot():
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
+    application.add_handler(CommandHandler("ban", ban_cmd))
+    application.add_handler(CommandHandler("unban", unban_cmd))
     application.add_handler(CommandHandler("check_balance", check_balance_cmd))
     application.add_handler(CommandHandler("set_trial_days", set_trial_days_cmd))
     application.add_handler(CommandHandler("remove_balance", remove_balance_cmd))
