@@ -1225,17 +1225,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         cooldown_time = cooldown_days * 24 * 60 * 60
         
-        # Check specific product history if available, else global
-        product_last_trial = 0
-        if "history" in user_trial and product in user_trial["history"]:
-            product_last_trial = user_trial["history"][product].get("last_trial", 0)
-        elif user_trial.get("last_product", "").lower() == product:
-            product_last_trial = user_trial.get("last_trial", 0)
-        elif "history" not in user_trial:
-            # Backward compatibility: if they claimed something recently but we don't know what
-            # enforce global cooldown to prevent spamming right after update.
-            product_last_trial = user_trial.get("last_trial", 0)
-            
+        # Global trial history
+        product_last_trial = user_trial.get("last_trial", 0)
         time_since_last = time.time() - product_last_trial
         
         if time_since_last < cooldown_time:
@@ -1244,12 +1235,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             m, s = divmod(remainder, 60)
             keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
             
-            last_key = "None"
-            last_prod = product.upper()
-            if "history" in user_trial and product in user_trial["history"]:
-                last_key = user_trial["history"][product].get("last_key", "None")
-            elif user_trial.get("last_product", "").lower() == product:
-                last_key = user_trial.get("last_key", "None")
+            last_key = user_trial.get("last_key", "None")
+            last_prod = user_trial.get("last_product", "Any Product").upper()
                 
             msg = f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next {last_prod} trial key after this time."
             if last_key != "None":
@@ -1654,6 +1641,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             debug_log(f"Clicked walletpay: {data}")
             order_id = data.split("_")[1]
+            if context.user_data.get(f"processed_{order_id}"):
+                await query.answer("Processing...", show_alert=False)
+                return
+            context.user_data[f"processed_{order_id}"] = True
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except:
+                pass
             amount = float(context.user_data.get("amount", "0"))
             product = context.user_data.get("product", "hxn")
             duration_label = context.user_data.get("duration", "1d")
@@ -1689,19 +1684,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         debug_log("Calling log_reseller_action")
                         log_reseller_action(username_str, user_id_str, product, delivered_key)
                         debug_log("log_reseller_action finished")
+                    log_user_action(user_id_str, product.upper(), delivered_key)
                 
                     settings = load_settings()
                     admin_ids = settings.get("admin_ids", [])
                     for admin_id in admin_ids:
                         try:
                             admin_msg = (
-                                f"🔔 <b>NEW WALLET PURCHASE</b>\\n"
-                                f"━━━━━━━━━━━━━━━━━━\\n"
-                                f"👤 <b>User:</b> {username_str} (<code>{user_id_str}</code>)\\n"
-                                f"🏺 <b>Product:</b> {product.upper()}\\n"
-                                f"⏳ <b>Duration:</b> {duration_label.upper()}\\n"
-                                f"💵 <b>Amount Paid:</b> ₹{amount}\\n"
-                                f"🔑 <b>Key Generated:</b> <code>{delivered_key}</code>\\n"
+                                f"🔔 <b>NEW WALLET PURCHASE</b>\n"
+                                f"━━━━━━━━━━━━━━━━━━\n"
+                                f"👤 <b>User:</b> {username_str} (<code>{user_id_str}</code>)\n"
+                                f"🏺 <b>Product:</b> {product.upper()}\n"
+                                f"⏳ <b>Duration:</b> {duration_label.upper()}\n"
+                                f"💵 <b>Amount Paid:</b> ₹{amount}\n"
+                                f"🔑 <b>Key Generated:</b> <code>{delivered_key}</code>\n"
                             )
                             await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
                         except:
