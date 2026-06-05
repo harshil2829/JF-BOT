@@ -1225,17 +1225,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         cooldown_time = cooldown_days * 24 * 60 * 60
         
-        # Check specific product history if available, else global
-        product_last_trial = 0
-        if "history" in user_trial and product in user_trial["history"]:
-            product_last_trial = user_trial["history"][product].get("last_trial", 0)
-        elif user_trial.get("last_product", "").lower() == product:
-            product_last_trial = user_trial.get("last_trial", 0)
-        elif "history" not in user_trial:
-            # Backward compatibility: if they claimed something recently but we don't know what
-            # enforce global cooldown to prevent spamming right after update.
-            product_last_trial = user_trial.get("last_trial", 0)
-            
+        # Global trial history
+        product_last_trial = user_trial.get("last_trial", 0)
         time_since_last = time.time() - product_last_trial
         
         if time_since_last < cooldown_time:
@@ -1244,12 +1235,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             m, s = divmod(remainder, 60)
             keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
             
-            last_key = "None"
-            last_prod = product.upper()
-            if "history" in user_trial and product in user_trial["history"]:
-                last_key = user_trial["history"][product].get("last_key", "None")
-            elif user_trial.get("last_product", "").lower() == product:
-                last_key = user_trial.get("last_key", "None")
+            last_key = user_trial.get("last_key", "None")
+            last_prod = user_trial.get("last_product", "Any Product").upper()
                 
             msg = f"⏳ <b>TRIAL COOLDOWN</b>\n━━━━━━━━━━━━━━\nPlease wait for {h}h {m}m {s}s.\nYou can claim your next {last_prod} trial key after this time."
             if last_key != "None":
