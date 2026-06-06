@@ -477,7 +477,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_data["date"] = today_str
                     user_data["daily_count"] = 0
                 
-                if user_data.get("daily_count", 0) < 10:
+                if user_data.get("daily_count", 0) < 5:
                     user_data["count"] = user_data.get("count", 0) + 1
                     user_data["daily_count"] = user_data.get("daily_count", 0) + 1
                     user_data["earnings"] = user_data.get("earnings", 0.0) + 10.0
@@ -488,14 +488,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     save_balances(bals)
                     
                     try:
-                        await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00! (Daily Limit: {user_data['daily_count']}/10)", parse_mode="HTML")
+                        await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00! (Daily Limit: {user_data['daily_count']}/5)", parse_mode="HTML")
                     except:
                         pass
                 else:
                     # Over daily limit, still save that they referred so the new user isn't prompted again
                     save_referrals(refs)
                     try:
-                        await context.bot.send_message(chat_id=int(referrer_id), text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 10 paid referrals per day. You did not earn ₹10 for this one.", parse_mode="HTML")
+                        await context.bot.send_message(chat_id=int(referrer_id), text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 5 paid referrals per day. You did not earn ₹10 for this one.", parse_mode="HTML")
                     except:
                         pass
     
