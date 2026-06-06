@@ -63,6 +63,17 @@ def load_trials():
 def save_trials(data):
     set_cached("trials", data)
 
+def load_global_stats():
+    return get_cached("global_stats", {"total_keys_used": 0})
+
+def save_global_stats(stats):
+    set_cached("global_stats", stats)
+
+def increment_total_keys():
+    stats = load_global_stats()
+    stats["total_keys_used"] = stats.get("total_keys_used", 0) + 1
+    save_global_stats(stats)
+
 def load_balances():
     return get_cached("balances", {})
 
@@ -1250,12 +1261,16 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_resellers = len(resellers)
     total_keys = sum(len(k) for k in keys.values())
     
+    global_stats = load_global_stats()
+    total_keys_used = global_stats.get("total_keys_used", 0)
+    
     msg = f"📊 <b>BOT STATISTICS</b> 📊\n━━━━━━━━━━━━━━\n"
     msg += f"👥 <b>Total Users:</b> {total_users}\n"
     msg += f"💰 <b>Total User Balances:</b> ₹{total_balance:.2f}\n"
     msg += f"🚫 <b>Banned Users (Trials):</b> {total_banned}\n"
     msg += f"💼 <b>Active Resellers:</b> {total_resellers}\n"
     msg += f"📦 <b>Total Keys in Stock:</b> {total_keys}\n"
+    msg += f"🔑 <b>Total Keys Generated:</b> {total_keys_used}\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
 
