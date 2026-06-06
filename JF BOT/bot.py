@@ -459,7 +459,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Referral System
     if context.args and len(context.args) > 0:
         referrer_id = context.args[0]
-        if str(referrer_id).isdigit() and str(referrer_id) != str(user_id):
+        settings = load_settings()
+        if not settings.get("refer_locked", False) and str(referrer_id).isdigit() and str(referrer_id) != str(user_id):
             refs = load_referrals()
             if "referred" not in refs: refs["referred"] = []
             if "users" not in refs: refs["users"] = {}
@@ -1264,6 +1265,37 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"✅ <b>Broadcast Completed!</b>\nSuccessfully sent to {count} users.", parse_mode="HTML")
 
+async def lock_refer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    settings["refer_locked"] = True
+    save_settings(settings)
+    await update.message.reply_text("🔒 <b>Referral System Locked!</b>\nNobody can earn money from referrals now.", parse_mode="HTML")
+
+async def unlock_refer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    settings["refer_locked"] = False
+    save_settings(settings)
+    await update.message.reply_text("🔓 <b>Referral System Unlocked!</b>\nBroadcasting notification to all users...", parse_mode="HTML")
+    
+    users = load_users()
+    msg = "🎉 <b>THE REFERRAL SYSTEM IS BACK ONLINE!</b> 🎉\n\nInvite your friends to our bot and earn ₹10 per invite instantly to your wallet! Use the '🎁 Referral' button in the bot to get your link."
+    success, failed = 0, 0
+    import asyncio
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=uid, text=msg, parse_mode="HTML")
+            success += 1
+        except:
+            failed += 1
+        await asyncio.sleep(0.05)
+    await update.message.reply_text(f"✅ <b>Broadcast Complete!</b>\nSent to: {success}\nFailed: {failed}", parse_mode="HTML")
+
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -1604,6 +1636,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]), parse_mode="HTML")
     elif data == "referral":
+        settings = load_settings()
+        if settings.get("refer_locked", False):
+            await query.answer("❌ The Referral System is currently paused by the Admin.", show_alert=True)
+            return
+            
         bot_username = (await context.bot.get_me()).username
         referral_link = f"https://t.me/{bot_username}?start={update.effective_user.id}"
         refs = load_referrals()
@@ -2267,6 +2304,8 @@ async def run_bot():
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
     application.add_handler(CommandHandler("stats", stats_cmd))
+    application.add_handler(CommandHandler("lock_refer", lock_refer_cmd))
+    application.add_handler(CommandHandler("unlock_refer", unlock_refer_cmd))
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
     application.add_handler(CommandHandler("ban", ban_cmd))
     application.add_handler(CommandHandler("unban", unban_cmd))
