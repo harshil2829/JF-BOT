@@ -1203,11 +1203,12 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ You are not authorized to broadcast.")
         return
 
-    if not context.args:
-        await update.message.reply_text("Usage: /bc [Your Message]")
+    is_reply = bool(update.message.reply_to_message)
+    if not context.args and not is_reply:
+        await update.message.reply_text("Usage: /bc [Your Message]\nOR reply to an image/video/message with /bc [optional caption]")
         return
 
-    msg_to_send = " ".join(context.args)
+    msg_to_send = " ".join(context.args) if context.args else None
     users = load_users()
     
     count = 0
@@ -1215,13 +1216,48 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for uid in users:
         try:
-            await context.bot.send_message(chat_id=uid, text=msg_to_send, parse_mode="HTML")
+            if is_reply:
+                await context.bot.copy_message(
+                    chat_id=uid, 
+                    from_chat_id=update.effective_chat.id, 
+                    message_id=update.message.reply_to_message.message_id, 
+                    caption=msg_to_send, 
+                    parse_mode="HTML"
+                )
+            else:
+                await context.bot.send_message(chat_id=uid, text=msg_to_send, parse_mode="HTML")
             count += 1
             await asyncio.sleep(0.05) # Small delay to avoid flooding
         except Exception as e:
-            logger.error(f"Failed to send to {uid}: {e}")
+            pass # Ignore users who blocked the bot
 
     await update.message.reply_text(f"✅ <b>Broadcast Completed!</b>\nSuccessfully sent to {count} users.", parse_mode="HTML")
+
+async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    users = load_users()
+    balances = load_balances()
+    trials = load_trials()
+    resellers = load_resellers()
+    keys = load_keys()
+    
+    total_users = len(users)
+    total_balance = sum(balances.values())
+    total_banned = sum(1 for t in trials.values() if t.get("banned", False))
+    total_resellers = len(resellers)
+    total_keys = sum(len(k) for k in keys.values())
+    
+    msg = f"📊 <b>BOT STATISTICS</b> 📊\n━━━━━━━━━━━━━━\n"
+    msg += f"👥 <b>Total Users:</b> {total_users}\n"
+    msg += f"💰 <b>Total User Balances:</b> ₹{total_balance:.2f}\n"
+    msg += f"🚫 <b>Banned Users (Trials):</b> {total_banned}\n"
+    msg += f"💼 <b>Active Resellers:</b> {total_resellers}\n"
+    msg += f"📦 <b>Total Keys in Stock:</b> {total_keys}\n"
+    
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -2195,6 +2231,7 @@ async def run_bot():
     application.add_handler(CommandHandler("set_welcome", set_welcome))
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
+    application.add_handler(CommandHandler("stats", stats_cmd))
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
     application.add_handler(CommandHandler("ban", ban_cmd))
     application.add_handler(CommandHandler("unban", unban_cmd))
