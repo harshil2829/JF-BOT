@@ -465,19 +465,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "users" not in refs: refs["users"] = {}
             if user_id not in refs["referred"]:
                 refs["referred"].append(user_id)
-                if referrer_id not in refs["users"]: refs["users"][referrer_id] = {"count": 0, "earnings": 0.0}
-                refs["users"][referrer_id]["count"] += 1
-                refs["users"][referrer_id]["earnings"] += 10.0
-                save_referrals(refs)
                 
-                bals = load_balances()
-                bals[str(referrer_id)] = bals.get(str(referrer_id), 0.0) + 10.0
-                save_balances(bals)
+                if referrer_id not in refs["users"]: 
+                    refs["users"][referrer_id] = {"count": 0, "earnings": 0.0, "daily_count": 0, "date": ""}
                 
-                try:
-                    await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00!", parse_mode="HTML")
-                except:
-                    pass
+                from datetime import datetime
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                
+                user_data = refs["users"][referrer_id]
+                if user_data.get("date") != today_str:
+                    user_data["date"] = today_str
+                    user_data["daily_count"] = 0
+                
+                if user_data.get("daily_count", 0) < 10:
+                    user_data["count"] = user_data.get("count", 0) + 1
+                    user_data["daily_count"] = user_data.get("daily_count", 0) + 1
+                    user_data["earnings"] = user_data.get("earnings", 0.0) + 10.0
+                    save_referrals(refs)
+                    
+                    bals = load_balances()
+                    bals[str(referrer_id)] = bals.get(str(referrer_id), 0.0) + 10.0
+                    save_balances(bals)
+                    
+                    try:
+                        await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00! (Daily Limit: {user_data['daily_count']}/10)", parse_mode="HTML")
+                    except:
+                        pass
+                else:
+                    # Over daily limit, still save that they referred so the new user isn't prompted again
+                    save_referrals(refs)
+                    try:
+                        await context.bot.send_message(chat_id=int(referrer_id), text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 10 paid referrals per day. You did not earn ₹10 for this one.", parse_mode="HTML")
+                    except:
+                        pass
     
     verified_users = load_verified_users()
     settings = load_settings()
