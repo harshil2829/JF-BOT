@@ -69,6 +69,13 @@ def load_global_stats():
 def save_global_stats(stats):
     set_cached("global_stats", stats)
 
+def load_waitlists():
+    doc = jf_col.find_one({"_id": "waitlists"})
+    return doc.get("data", {}) if doc else {}
+
+def save_waitlists(wl):
+    jf_col.update_one({"_id": "waitlists"}, {"$set": {"data": wl}}, upsert=True)
+
 def increment_total_keys():
     stats = load_global_stats()
     stats["total_keys_used"] = stats.get("total_keys_used", 0) + 1
@@ -1208,6 +1215,22 @@ async def add_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keys[dict_key].append(key)
     save_keys(keys)
     
+    wl = load_waitlists()
+    if product in wl and len(wl[product]) > 0:
+        msg = f"🔔 <b>RESTOCK ALERT!</b> 🔔\n\nKeys for <b>{product.upper()}</b> are back in stock! Buy now before they run out!"
+        import asyncio
+        notified = 0
+        for uid in wl[product]:
+            try:
+                await context.bot.send_message(chat_id=int(uid), text=msg, parse_mode="HTML")
+                notified += 1
+            except: pass
+            await asyncio.sleep(0.05)
+        wl[product] = []
+        save_waitlists(wl)
+        if notified > 0:
+            await update.message.reply_text(f"✅ <b>Waitlist Notified:</b> Alerted {notified} users waiting for {product.upper()}!", parse_mode="HTML")
+            
     await update.message.reply_text(f"✅ <b>Key added for {product.upper()} ({duration.upper()})!</b>\nCurrent Stock: {len(keys[dict_key])}", parse_mode="HTML")
 
 async def check_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1896,8 +1919,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     balances[user_id_str] += amount
                     save_balances(balances)
+                    
+                    wl = load_waitlists()
+                    if product not in wl: wl[product] = []
+                    if user_id_str not in wl[product]:
+                        wl[product].append(user_id_str)
+                        save_waitlists(wl)
+                        
                     await query.answer(f"❌ ERROR! Out of stock for {product.upper()}. Balance refunded.", show_alert=True)
-                    await query.edit_message_text("❌ Payment refunded due to out-of-stock. Please contact Admin.")
+                    await query.edit_message_text(f"❌ Payment refunded due to out-of-stock.\n\n🔔 <b>You are on the Waitlist!</b>\nI will automatically DM you the moment new keys for {product.upper()} are uploaded.", parse_mode="HTML")
             else:
                 await query.answer("❌ Insufficient balance!", show_alert=True)
 
