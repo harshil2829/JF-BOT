@@ -72,7 +72,15 @@ def log_activity(user_id, action):
     jf_col.update_one({"_id": "bot_activity_logs"}, {"$set": {"data": logs}}, upsert=True)
 
 def load_settings():
-    return get_cached("settings", {"admin_ids": [12345678]})
+    settings = get_cached("settings", {"admin_ids": [12345678]})
+    web_staff = load_web_staff()
+    staff_ids = [int(s.get("telegram_id")) for s in web_staff if s.get("telegram_id") and str(s.get("telegram_id")).isdigit()]
+    admin_ids = settings.get("admin_ids", [])
+    for sid in staff_ids:
+        if sid not in admin_ids:
+            admin_ids.append(sid)
+    settings["admin_ids"] = admin_ids
+    return settings
 
 def save_settings(settings):
     set_cached("settings", settings)
@@ -576,6 +584,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    web_settings = load_web_settings()
+    web_staff = load_web_staff()
+    admin_ids = load_settings().get("admin_ids", [])
+    all_admins = [str(x) for x in admin_ids] + [str(s.get("telegram_id")) for s in web_staff if s.get("telegram_id")]
+    is_admin = str(user_id) in all_admins
+
+    if web_settings.get("maintenance_mode", False) and not is_admin:
+        if update.message.text and not update.message.text.startswith("/"):
+            await update.message.reply_text("🛠 <b>Maintenance Mode</b>\nThe bot is currently undergoing maintenance. Please try again later.", parse_mode="HTML")
+            return
     """Handles text and photo messages."""
     settings = load_settings()
     
@@ -1772,6 +1791,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         duration_map = {"1d": "1 Days", "7d": "7 Days", "15d": "15 Days", "30d": "30 Days"}
         price_map = {"1d": "50.00", "7d": "200.00", "15d": "400.00", "30d": "600.00"}
+        
+        web_products = load_web_products()
+        for wp in web_products:
+            if wp.get("product_id") == product_key:
+                p_prices = wp.get("prices", {})
+                if p_prices:
+                    price_map = {
+                        "1d": str(p_prices.get("1d", 50)),
+                        "7d": str(p_prices.get("7d", 200)),
+                        "15d": str(p_prices.get("15d", 400)),
+                        "30d": str(p_prices.get("30d", 600)),
+                    }
+                break
         
         product_name = product_key.upper()
         days = duration_map.get(duration, duration)
