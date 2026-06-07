@@ -51,6 +51,26 @@ def set_cached(key, data):
     _CACHE[key] = (data, time.time())
     jf_col.update_one({"_id": key}, {"$set": {"data": data}}, upsert=True)
 
+def load_web_settings():
+    doc = jf_col.find_one({"_id": "web_settings"})
+    return doc.get("data", {}) if doc else {}
+
+def load_web_staff():
+    doc = jf_col.find_one({"_id": "web_staff"})
+    return doc.get("data", []) if doc else []
+
+def load_web_products():
+    doc = jf_col.find_one({"_id": "web_products"})
+    return doc.get("data", []) if doc else []
+
+def log_activity(user_id, action):
+    doc = jf_col.find_one({"_id": "bot_activity_logs"})
+    logs = doc.get("data", []) if doc else []
+    import datetime
+    logs.append({"uid": str(user_id), "action": action, "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+    if len(logs) > 50: logs = logs[-50:]
+    jf_col.update_one({"_id": "bot_activity_logs"}, {"$set": {"data": logs}}, upsert=True)
+
 def load_settings():
     return get_cached("settings", {"admin_ids": [12345678]})
 
@@ -462,6 +482,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🚫 You are banned from this bot for abusing the trial system.")
         return
     save_user(user_id)
+    log_activity(user_id, 'started the bot')
     
     # Referral System
     if context.args and len(context.args) > 0:
@@ -1162,6 +1183,7 @@ async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if delivered_key:
         username = f"@{update.effective_user.username}" if update.effective_user.username else str(update.effective_user.first_name)
         log_reseller_action(username, user_id, product, delivered_key)
+        log_activity(user_id, f'reseller generated {product} key')
         success_msg = (
             "✅ <b>RESELLER KEY GENERATED</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -1884,6 +1906,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         log_reseller_action(username_str, user_id_str, product, delivered_key)
                         debug_log("log_reseller_action finished")
                     log_user_action(user_id_str, product.upper(), delivered_key)
+                    log_activity(user_id_str, f'generated {product} key')
                 
                     settings = load_settings()
                     admin_ids = settings.get("admin_ids", [])
