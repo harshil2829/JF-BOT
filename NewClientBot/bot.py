@@ -1456,22 +1456,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "admin_add_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
         keyboard = [
-            [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
-            [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
-            [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx")],
-            [InlineKeyboardButton("STREAMER-X PRO", callback_data="bulk_prod_streamerpro"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
-            [InlineKeyboardButton("GREED", callback_data="bulk_prod_greed"), InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="bulk_prod_primehook")],
-            [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
-            [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
-            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj")],
-            [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
-            [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
-            [InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro"), InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon")],
-            [InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
-            [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure")],
-            [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
-            [InlineKeyboardButton("OS VICTORY 8BP", callback_data="bulk_prod_osvictory")],
+            [InlineKeyboardButton("ALPHA-X STORE", callback_data="bulk_prod_alphax"), InlineKeyboardButton("LK TEAM", callback_data="bulk_prod_lkteam")],
+            [InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods"), InlineKeyboardButton("HEX BLADE", callback_data="bulk_prod_hexblade")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         context.user_data["state"] = "awaiting_bulk_product"
