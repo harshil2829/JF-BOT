@@ -809,11 +809,20 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/remove_reseller [id] - Remove a reseller\n"
         "/resellers - List all active resellers\n"
         "/rlogs [id] - View reseller activity\n"
-        "/broadcast [msg] - Send a message to all users\n"
+        "/bc [msg] - Send a message to all users\n"
         "/add_key [prod] [duration] [key] - Add a single license key\n"
         "/stock - Check remaining keys stock"
     )
-    await update.message.reply_text(admin_text, parse_mode="HTML")
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
+        [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
+        [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
+        [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+        [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
+        [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
+    ]
+    await update.message.reply_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
 async def set_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -2093,10 +2102,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
             "👑 <code>/resellers</code> - List active resellers\n"
             "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
-            "📢 <code>/broadcast [message]</code> - Send message to all users\n"
+            "📢 <code>/bc [message]</code> (or /broadcast) - Send message to all users\n"
             "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
             "📦 <code>/stock</code> - Check stock levels\n"
-            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials"
+            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials\n"
+            "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
+            "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
+            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions"
         )
         await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
@@ -2348,12 +2360,47 @@ async def rperms_cmd(update, context):
     save_reseller_perms(perms)
     await update.message.reply_text(f"✅ Permissions updated for reseller {target_id}.\nAllowed: {perms[target_id]}")
 
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id in settings["admin_ids"]:
+        help_text = (
+            "❓ <b>ADMIN SLASH COMMANDS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💬 <code>/set_welcome [text]</code> - Update welcome message\n"
+            "👤 <code>/add_admin [telegram_id]</code> - Add new admin\n"
+            "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
+            "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
+            "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
+            "👑 <code>/resellers</code> - List active resellers\n"
+            "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
+            "📢 <code>/broadcast [message]</code> (or /bc) - Send message to all users\n"
+            "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
+            "📦 <code>/stock</code> - Check stock levels\n"
+            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials\n"
+            "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
+            "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
+            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions"
+        )
+        await update.message.reply_text(help_text, parse_mode="HTML")
+    else:
+        help_text = (
+            "ℹ️ <b>STORE HELPLINE</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "Use the menu buttons below to navigate the shop.\n\n"
+            "👤 <b>Support:</b> @ahmedakash007\n"
+            "📢 <b>Join Channel:</b> https://t.me/JFFREEAPK"
+        )
+        await update.message.reply_text(help_text, parse_mode="HTML")
+
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_my_id))
+    application.add_handler(CommandHandler("help", help_cmd))
+    application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("set_welcome", set_welcome))
     application.add_handler(CommandHandler("add_admin", add_admin))
