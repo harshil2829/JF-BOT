@@ -1719,42 +1719,71 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif data.startswith("product_"):
-        product_name = data.replace("product_", "").upper().replace("_", " ")
-        price_text = (
-            f"🛒 <b>{product_name}</b>\
-"
-            "━━━━━━━━━━━━━━━━━━\
-"
-            "📦 <b>Select Duration:</b>\
-\
-"
-            "<i>Note: 1 USD = 120 BDT</i>"
-        )
-        keyboard = [
-            [InlineKeyboardButton("1 Day", callback_data=f"buy_{data}_1d"), InlineKeyboardButton("3 Days", callback_data=f"buy_{data}_3d")],
-            [InlineKeyboardButton("7 Days", callback_data=f"buy_{data}_7d"), InlineKeyboardButton("15 Days", callback_data=f"buy_{data}_15d")],
-            [InlineKeyboardButton("30 Days", callback_data=f"buy_{data}_30d")],
-            [InlineKeyboardButton("« Back To Store", callback_data="shop")]
+        product_key = data.replace("product_", "")
+        product_name = product_key.upper().replace("_", " ")
+        keys_db = load_keys()
+        
+        price_map = {"1d": 1.00, "3d": 2.00, "5d": 4.00, "7d": 7.00, "30d": 9.00}
+        bdt_rate = 120
+        
+        durations = [
+            ("1d", "1 Day"), ("3d", "3 Days"), ("5d", "5 Days"), 
+            ("7d", "7 Days"), ("30d", "30 Days")
         ]
+        
+        price_text = f"🛒 🛍 <b>{product_name}</b>\n\n"
+        
+        for dur_key, dur_label in durations:
+            usd = price_map[dur_key]
+            bdt = usd * bdt_rate
+            stock_key = f"{product_key}_{dur_key}"
+            stock_count = len(keys_db.get(stock_key, []))
+            stock_emoji = "✅ In Stock" if stock_count > 0 else "🛒 ❌ Out of Stock"
+            
+            price_text += (
+                f"⏳ <b>{dur_label}</b>\n"
+                f"   💰 ${usd:.2f} (৳{bdt:.2f})\n"
+                f"   {stock_emoji}\n\n"
+            )
+        
+        price_text += "━━━━━━━━━━━━━━━━━━\n👇 <b>Select duration below:</b>"
+        
+        keyboard = []
+        for dur_key, dur_label in durations:
+            usd = price_map[dur_key]
+            bdt = usd * bdt_rate
+            keyboard.append([InlineKeyboardButton(
+                f"🛍 Buy {dur_label} - ${usd:.2f} (৳{bdt:.2f})", 
+                callback_data=f"buy_{product_key}_{dur_key}"
+            )])
+        keyboard.append([InlineKeyboardButton("🏪 Back to Shop", callback_data="shop")])
+        
         await query.edit_message_text(price_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        
     elif data.startswith("buy_"):
         parts = data.split("_")
-        product_key = parts[2]
-        duration = parts[3]
+        product_key = parts[1]
+        duration = parts[2]
         
-        duration_map = {"1d": "1 Days", "3d": "3 Days", "7d": "7 Days", "15d": "15 Days", "30d": "30 Days"}
-        price_map = {"1d": "2.00", "3d": "4.00", "7d": "6.00", "15d": "10.00", "30d": "18.00"}
+        price_map = {"1d": 1.00, "3d": 2.00, "5d": 4.00, "7d": 7.00, "30d": 9.00}
+        duration_map = {"1d": "1 Day", "3d": "3 Days", "5d": "5 Days", "7d": "7 Days", "30d": "30 Days"}
+        bdt_rate = 120
         
-
-        
-        product_name = product_key.upper()
+        amount = price_map.get(duration, 1.00)
         days = duration_map.get(duration, duration)
-        amount = price_map.get(duration, "0.00")
+        product_name = product_key.upper().replace("_", " ")
+        bdt_amount = amount * bdt_rate
+        
+        keys_db = load_keys()
+        stock_key = f"{product_key}_{duration}"
+        if len(keys_db.get(stock_key, [])) == 0:
+            await query.answer("❌ This item is currently Out of Stock!", show_alert=True)
+            return
+        
         order_id = "OID" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         
-        # Store transaction details
         context.user_data["product"] = product_key
-        context.user_data["amount"] = amount
+        context.user_data["amount"] = f"{amount:.2f}"
         context.user_data["duration"] = duration
         context.user_data["order_id"] = order_id
         
@@ -1763,33 +1792,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         resellers = load_resellers()
         
         user_bal = balances.get(user_id_str, 0.0)
-        float_amount = float(amount)
         is_reseller = user_id_str in resellers and time.time() < resellers[user_id_str]
         
         if is_reseller:
-            float_amount = float_amount * 0.7  # 30% Discount
-            amount = f"{float_amount:.2f}"
-            context.user_data["amount"] = amount
-            
-        await query.message.delete()
+            amount = amount * 0.7
+            context.user_data["amount"] = f"{amount:.2f}"
+            bdt_amount = amount * bdt_rate
         
-        if user_bal >= float_amount:
+        if user_bal >= amount:
             title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
             full_payment_text = (
-                "<b>Status:</b> <code>Ready to Checkout</code>\n"
-                "<i>Pay using your Wallet Balance.</i>\n\n"
+                f"{title}\n"
                 "━━━━━━━━━━━━━━━━━━\n"
-                f"{title}\n\n"
-                f"🏺 <b>Product:</b> {product_name}\n"
+                f"🛍 <b>Product:</b> {product_name}\n"
                 f"⏳ <b>Duration:</b> {days}\n"
-                f"💵 <b>Pay Amount:</b> ${amount}\n"
+                f"💵 <b>Amount:</b> ${amount:.2f} (৳{bdt_amount:.2f})\n"
                 f"💰 <b>Your Balance:</b> ${user_bal:.2f}\n\n"
                 "<i>Click '💰 Pay with Wallet' to buy instantly.</i>"
             )
             full_keyboard = [
                 [InlineKeyboardButton("💰 Pay with Wallet", callback_data=f"walletpay_{order_id}")],
+                [InlineKeyboardButton("💳 Pay Manually", callback_data=f"choosepay_{order_id}")],
                 [InlineKeyboardButton("« Back to Store", callback_data="shop")]
             ]
+            await query.message.delete()
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
                 text=full_payment_text,
