@@ -1476,9 +1476,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product = data.split("_")[2]
         context.user_data["bulk_product"] = product
         keyboard = [
-            [InlineKeyboardButton("1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton("7 Days", callback_data="bulk_dur_7d")],
-            [InlineKeyboardButton("15 Days", callback_data="bulk_dur_15d"), InlineKeyboardButton("30 Days", callback_data="bulk_dur_30d")],
-            [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")],
+            [InlineKeyboardButton("1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton("3 Days", callback_data="bulk_dur_3d")],
+            [InlineKeyboardButton("7 Days", callback_data="bulk_dur_7d"), InlineKeyboardButton("15 Days", callback_data="bulk_dur_15d")],
+            [InlineKeyboardButton("30 Days", callback_data="bulk_dur_30d"), InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")],
             [InlineKeyboardButton("🗑️ Clear All Stock", callback_data=f"clear_stock_{product}")],
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_add_keys")]
         ]
@@ -1761,12 +1761,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product_name = product_key.upper().replace("_", " ")
         keys_db = load_keys()
         
-        price_map = {"1d": 1.00, "3d": 2.00, "5d": 4.00, "7d": 7.00, "30d": 9.00}
+        price_map = {"1d": 1.00, "3d": 2.00, "7d": 4.00, "15d": 7.00, "30d": 9.00}
         bdt_rate = 120
         
         durations = [
-            ("1d", "1 Day"), ("3d", "3 Days"), ("5d", "5 Days"), 
-            ("7d", "7 Days"), ("30d", "30 Days")
+            ("1d", "1 Day"), ("3d", "3 Days"), ("7d", "7 Days"), 
+            ("15d", "15 Days"), ("30d", "30 Days")
         ]
         
         price_text = f"🛒 🛍 <b>{product_name}</b>\n\n"
@@ -1803,8 +1803,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product_key = parts[1]
         duration = parts[2]
         
-        price_map = {"1d": 1.00, "3d": 2.00, "5d": 4.00, "7d": 7.00, "30d": 9.00}
-        duration_map = {"1d": "1 Day", "3d": "3 Days", "5d": "5 Days", "7d": "7 Days", "30d": "30 Days"}
+        price_map = {"1d": 1.00, "3d": 2.00, "7d": 4.00, "15d": 7.00, "30d": 9.00}
+        duration_map = {"1d": "1 Day", "3d": "3 Days", "7d": "7 Days", "15d": "15 Days", "30d": "30 Days"}
         bdt_rate = 120
         
         amount = price_map.get(duration, 1.00)
