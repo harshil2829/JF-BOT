@@ -547,6 +547,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📢 <b>Forwarded Channel ID:</b> <code>{chat_id}</code>\n\nUse this in:\n<code>/add_channel {chat_id} [link]</code>", parse_mode="HTML")
         return
 
+    # Reset state if a command or Admin Panel button is used
+    msg_text = getattr(update.message, "text", None)
+    if msg_text and (msg_text.startswith("/") or msg_text == "👑 Admin Panel"):
+        if context.user_data:
+            context.user_data["state"] = None
+            context.user_data["order_id"] = None
+
     # Check if user is in a specific state (like waiting for a receipt)
     state = context.user_data.get("state") if context.user_data else None
     settings = load_settings()
