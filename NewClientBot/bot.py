@@ -89,6 +89,19 @@ def load_settings():
 def save_settings(settings):
     set_cached("settings", settings)
 
+def load_products():
+    default_products = [
+        {"key": "alphax", "name": "ALPHA-X STORE"},
+        {"key": "lkteam", "name": "LK TEAM"},
+        {"key": "brmods", "name": "BR MODS"},
+        {"key": "hexblade", "name": "HEX BLADE"}
+    ]
+    settings = load_settings()
+    if "products" not in settings:
+        settings["products"] = default_products
+        save_settings(settings)
+    return settings["products"]
+
 def load_trials():
     return get_cached("trials", {})
 
@@ -1332,13 +1345,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
             
-        keyboard = [
-            [InlineKeyboardButton("🎁 ALPHA-X STORE", callback_data="claim_trial_alphax")],
-            [InlineKeyboardButton("🎁 LK TEAM", callback_data="claim_trial_lkteam")],
-            [InlineKeyboardButton("🎁 BR MODS", callback_data="claim_trial_brmods")],
-            [InlineKeyboardButton("🎁 HEX BLADE", callback_data="claim_trial_hexblade")],
-            [InlineKeyboardButton("« Back", callback_data="main_menu")]
-        ]
+        products = load_products()
+        keyboard = []
+        for p in products:
+            keyboard.append([InlineKeyboardButton(f"🎁 {p['name']}", callback_data=f"claim_trial_{p['key']}")])
+        keyboard.append([InlineKeyboardButton("« Back", callback_data="main_menu")])
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
@@ -1447,11 +1458,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "admin_add_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
-        keyboard = [
-            [InlineKeyboardButton("ALPHA-X STORE", callback_data="bulk_prod_alphax"), InlineKeyboardButton("LK TEAM", callback_data="bulk_prod_lkteam")],
-            [InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods"), InlineKeyboardButton("HEX BLADE", callback_data="bulk_prod_hexblade")],
-            [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
-        ]
+        products = load_products()
+        keyboard = []
+        for i in range(0, len(products), 2):
+            row = []
+            row.append(InlineKeyboardButton(products[i]["name"], callback_data=f"bulk_prod_{products[i]['key']}"))
+            if i+1 < len(products):
+                row.append(InlineKeyboardButton(products[i+1]["name"], callback_data=f"bulk_prod_{products[i+1]['key']}"))
+            keyboard.append(row)
+        keyboard.append([InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")])
         context.user_data["state"] = "awaiting_bulk_product"
         await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
@@ -2381,6 +2396,75 @@ async def unlock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_settings(settings)
             await update.message.reply_text(f"🔓 Global Trial lock removed! (If a specific mod was locked, use /unlock_trial [product])")
 
+async def add_product_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]:
+        await update.message.reply_text("❌ You are not authorized.")
+        return
+        
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text(
+            "📝 <b>Usage:</b>\n"
+            "<code>/add_product [product_key] [display_name]</code>\n\n"
+            "<b>Example:</b>\n"
+            "<code>/add_product newmod NEW MOD CHEAT</code>",
+            parse_mode="HTML"
+        )
+        return
+        
+    product_key = context.args[0].lower().strip()
+    product_name = " ".join(context.args[1:]).strip()
+    
+    products = load_products()
+    for p in products:
+        if p["key"] == product_key:
+            await update.message.reply_text(f"❌ Product key <code>{product_key}</code> already exists!", parse_mode="HTML")
+            return
+            
+    products.append({"key": product_key, "name": product_name})
+    settings["products"] = products
+    save_settings(settings)
+    
+    await update.message.reply_text(f"✅ Product <b>{product_name}</b> (<code>{product_key}</code>) has been added successfully!", parse_mode="HTML")
+
+async def delete_product_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]:
+        await update.message.reply_text("❌ You are not authorized.")
+        return
+        
+    if not context.args or len(context.args) < 1:
+        await update.message.reply_text(
+            "📝 <b>Usage:</b>\n"
+            "<code>/delete_product [product_key]</code>\n\n"
+            "<b>Example:</b>\n"
+            "<code>/delete_product newmod</code>",
+            parse_mode="HTML"
+        )
+        return
+        
+    product_key = context.args[0].lower().strip()
+    
+    products = load_products()
+    found = False
+    new_products = []
+    for p in products:
+        if p["key"] == product_key:
+            found = True
+        else:
+            new_products.append(p)
+            
+    if not found:
+        await update.message.reply_text(f"❌ Product key <code>{product_key}</code> not found!", parse_mode="HTML")
+        return
+        
+    settings["products"] = new_products
+    save_settings(settings)
+    
+    await update.message.reply_text(f"✅ Product <code>{product_key}</code> has been deleted successfully!", parse_mode="HTML")
+
 async def rperms_cmd(update, context):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -2418,7 +2502,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials\n"
             "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
             "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
-            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions"
+            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions\n"
+            "📦 <code>/add_product [key] [name]</code> - Add new product\n"
+            "🗑 <code>/delete_product [key]</code> - Delete a product"
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
     else:
@@ -2466,6 +2552,9 @@ async def run_bot():
     application.add_handler(CommandHandler("reset_trial", reset_trial))
     application.add_handler(CommandHandler("lock_trial", lock_trial_cmd))
     application.add_handler(CommandHandler("unlock_trial", unlock_trial_cmd))
+    application.add_handler(CommandHandler("add_product", add_product_cmd))
+    application.add_handler(CommandHandler("delete_product", delete_product_cmd))
+    application.add_handler(CommandHandler("del_product", delete_product_cmd))
     
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
