@@ -3,7 +3,7 @@ import os
 from pymongo import MongoClient
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:HARSHIL2829@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
-client = MongoClient(MONGO_URI)
+client = MongoClient(MONGO_URI, connectTimeoutMS=5000, socketTimeoutMS=5000, maxIdleTimeMS=30000, retryWrites=True)
 db = client['ClientBotDB']
 jf_col = db['client2_data']
 
@@ -416,46 +416,6 @@ async def create_upigateway_order(amount, order_id, user_name):
     return None
 
 async def generate_key_from_api(product, duration_label):
-    """Calls the Alwaysdata API to generate a real key."""
-    api_url = "https://harshilexe.alwaysdata.net/api/generate.php"
-    api_secret = "hxn_secret_12345"
-    
-    # Map durations from bot format to website format
-    duration_map = {
-        "1d": "1 Day",
-        "3d": "3 Days",
-        "7d": "7 Days",
-        "15d": "15 Days",
-        "30d": "30 Days"
-    }
-    site_duration = duration_map.get(duration_label, "1 Day")
-    
-    # Map products to IDs (You can add more later)
-    product_map = {
-        "hxn": 1,
-        "prime": 1,
-        "harshil": 1,
-        "streamerxsh": 1
-    }
-    product_id = product_map.get(product.lower(), 1)
-    
-    params = {
-        "secret": api_secret,
-        "product_id": product_id,
-        "duration": site_duration,
-        "amount": 1,
-        "max_devices": 1
-    }
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(api_url, params=params, timeout=10)
-            data = response.json()
-            if data.get("status") is True and data.get("keys"):
-                return data["keys"][0]
-        except Exception as e:
-            logger.error(f"API Error: {e}")
-            
     return None
 
 # --- HANDLERS ---
@@ -515,7 +475,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     verified_users = load_verified_users()
     settings = load_settings()
     
-    if True: # user_id in verified_users:
+    if user_id in verified_users:
         settings = load_settings()
         if not await check_force_sub(user_id, context):
             channels = settings.get("force_channels", [])
@@ -726,7 +686,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
                     [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-                    [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")]
+                    [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
+                    [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
                 ]
                 await update.message.reply_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return
@@ -1127,8 +1088,7 @@ async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product = context.args[0].lower()
     duration_label = context.args[1].lower()
     
-    auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
-    delivered_key = None
+    auto_products = []
     
     status_msg = await update.message.reply_text("🔄 Generating key...")
     
@@ -1353,13 +1313,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
-        keyboard = [
-            [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
-            [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
-            [InlineKeyboardButton("BOOYAH MOD", callback_data="claim_trial_boyyah"), InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo")],
-            [InlineKeyboardButton("GREED CHEAT", callback_data="claim_trial_greed"), InlineKeyboardButton("STREAMER X (.SH)", callback_data="claim_trial_streamerx")],
-            [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
-        ]
+            
+        web_products = load_web_products()
+        all_buttons = []
+        for wp in web_products:
+            name = wp.get("name", "")
+            if not name:
+                continue
+            if wp.get("status", "Active") != "Active":
+                continue
+            section = wp.get("section", "Both")
+            if section not in ["Both", "Trial"]:
+                continue
+            
+            display_name = name.upper().replace("_", " ")
+            all_buttons.append(InlineKeyboardButton(display_name, callback_data=f"claim_trial_{name.lower()}"))
+            
+        if not all_buttons:
+            defaults = ["hxn", "lk", "hex", "alpha", "boyyah", "ngo", "greed", "streamerx", "brmods"]
+            for d in defaults:
+                all_buttons.append(InlineKeyboardButton(d.upper(), callback_data=f"claim_trial_{d}"))
+                
+        keyboard = []
+        for i in range(0, len(all_buttons), 2):
+            keyboard.append(all_buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")])
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
@@ -1427,9 +1405,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dict_key = f"{product}_trial"
         
         delivered_key = None
-        if product == "hxn":
-            delivered_key = await generate_key_from_api("hxn", "1d")
-        elif dict_key in keys and len(keys[dict_key]) > 0:
+        if dict_key in keys and len(keys[dict_key]) > 0:
             delivered_key = keys[dict_key].pop(0)
             save_keys(keys)
             
@@ -1884,7 +1860,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 balances[user_id_str] -= amount
                 save_balances(balances)
             
-                auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
+                auto_products = []
                 delivered_key = None
             
                 if product in auto_products:
@@ -1997,7 +1973,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             duration_label = context.user_data.get("duration", "1d")
         
         # 1. GENERATE OR FETCH KEY
-        auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
+        auto_products = []
         
         if product in auto_products:
             delivered_key = await generate_key_from_api(product, duration_label)
@@ -2065,7 +2041,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if api_status == "success":
             # 1. GENERATE REAL KEY FROM WEBSITE
-            delivered_key = await generate_key_from_api(product, duration_label)
+            dict_key = f"{product}_{duration_label}"
+            keys = load_keys()
+            if dict_key in keys and len(keys[dict_key]) > 0:
+                delivered_key = keys[dict_key].pop(0)
+                save_keys(keys)
+            else:
+                delivered_key = None
             
             if delivered_key:
                 success_msg = (
@@ -2094,9 +2076,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
             [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-            [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")]
+            [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
+            [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_help_commands":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        help_text = (
+            "❓ <b>ADMIN SLASH COMMANDS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💬 <code>/set_welcome [text]</code> - Update welcome message\n"
+            "👤 <code>/add_admin [telegram_id]</code> - Add new admin\n"
+            "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
+            "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
+            "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
+            "👑 <code>/resellers</code> - List active resellers\n"
+            "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
+            "📢 <code>/broadcast [message]</code> - Send message to all users\n"
+            "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
+            "📦 <code>/stock</code> - Check stock levels\n"
+            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials"
+        )
+        await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To add a VIP reseller, type:\n<code>/add_reseller [user_id] [days]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_remove":

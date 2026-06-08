@@ -3,7 +3,7 @@ import os
 from pymongo import MongoClient
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:HARSHIL2829@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
-client = MongoClient(MONGO_URI)
+client = MongoClient(MONGO_URI, connectTimeoutMS=5000, socketTimeoutMS=5000, maxIdleTimeMS=30000, retryWrites=True)
 db = client['TelegramBotDB']
 jf_col = db['jf_data']
 
@@ -750,7 +750,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
                     [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-                    [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")]
+                    [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
+                    [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
                 ]
                 await update.message.reply_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return

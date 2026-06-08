@@ -1,35 +1,12 @@
 import logging
 import os
+
 from pymongo import MongoClient
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:HARSHIL2829@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
-client = MongoClient(MONGO_URI)
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
+client = MongoClient(MONGO_URI, connectTimeoutMS=5000, socketTimeoutMS=5000, maxIdleTimeMS=30000, retryWrites=True)
 db = client['TelegramBotDB']
 tele_col = db['tele_data']
-
-import asyncio
-import json
-import random
-import string
-import time
-import datetime
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler, ChatJoinRequestHandler
-import httpx
-
-# Enable logging
-import logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# CONFIGURATION
-TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs"
-UPI_GATEWAY_TOKEN = "0443e894-ef49-4f38-866d-e55fcab6408f" 
-IS_AUTO_MODE = False
-
-
 
 def load_settings():
     doc = tele_col.find_one({"_id": "settings"})
@@ -101,17 +78,9 @@ def save_reseller_logs(user_id, product, key):
     if len(logs) > 50: logs = logs[-50:]
     tele_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
 
-import os
-
-from pymongo import MongoClient
-
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:HARSHIL2829@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
-client = MongoClient(MONGO_URI)
-db = client['TelegramBotDB']
-tele_col = db['tele_data']
-
 import asyncio
 import json
+import os
 import random
 import string
 import time
@@ -121,7 +90,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import httpx
 
 # Enable logging
-import logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
@@ -129,42 +97,19 @@ logger = logging.getLogger(__name__)
 
 # CONFIGURATION
 TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs"
+SETTINGS_FILE = "settings.json"
+USERS_FILE = "users.json"
+VERIFIED_USERS_FILE = "verified_users.json"
+KEYS_FILE = "keys.json"
+UTR_LOG_FILE = "utr_log.json"
+BALANCES_FILE = "balances.json"
+RESELLERS_FILE = "resellers.json"
+RESELLER_LOGS_FILE = "reseller_logs.json"
+
+# --- UPI GATEWAY CONFIG ---
+# Using UPIGateway.com (Merchant Dashboard)
 UPI_GATEWAY_TOKEN = "0443e894-ef49-4f38-866d-e55fcab6408f" 
 IS_AUTO_MODE = False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Default settings if file is missing
@@ -173,37 +118,115 @@ DEFAULT_SETTINGS = {
     "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
 }
 
+def load_settings(): 
+    if not os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "w") as f:
+            json.dump(DEFAULT_SETTINGS, f, indent=4)
+        return DEFAULT_SETTINGS
+    with open(SETTINGS_FILE, "r") as f:
+        return json.load(f)
 
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(settings, f, indent=4)
 
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        return []
+    with open(USERS_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return []
 
+def save_user(user_id):
+    users = load_users()
+    if user_id not in users:
+        users.append(user_id)
+        with open(USERS_FILE, "w") as f:
+            json.dump(users, f, indent=4)
 
+def load_verified_users():
+    if not os.path.exists(VERIFIED_USERS_FILE):
+        return []
+    with open(VERIFIED_USERS_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return []
 
+def save_verified_user(user_id):
+    verified = load_verified_users()
+    if user_id not in verified:
+        verified.append(user_id)
+        with open(VERIFIED_USERS_FILE, "w") as f:
+            json.dump(verified, f, indent=4)
 
+def load_keys():
+    if not os.path.exists(KEYS_FILE):
+        return {}
+    with open(KEYS_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return {}
 
+def save_keys(keys):
+    with open(KEYS_FILE, "w") as f:
+        json.dump(keys, f, indent=4)
 
+def load_utr_log():
+    if not os.path.exists(UTR_LOG_FILE):
+        return []
+    with open(UTR_LOG_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return []
 
+def load_balances():
+    if not os.path.exists(BALANCES_FILE):
+        return {}
+    with open(BALANCES_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return {}
 
+def save_balances(balances):
+    with open(BALANCES_FILE, "w") as f:
+        json.dump(balances, f, indent=4)
 
+def load_resellers():
+    if not os.path.exists(RESELLERS_FILE): return {}
+    with open(RESELLERS_FILE, "r") as f:
+        try: return json.load(f)
+        except: return {}
 
+def save_resellers(resellers):
+    with open(RESELLERS_FILE, "w") as f:
+        json.dump(resellers, f, indent=4)
 
+def load_reseller_logs():
+    if not os.path.exists(RESELLER_LOGS_FILE): return {}
+    with open(RESELLER_LOGS_FILE, "r") as f:
+        try: return json.load(f)
+        except: return {}
 
+def log_reseller_action(user_id, product, duration_label):
+    logs = load_reseller_logs()
+    user_id = str(user_id)
+    if user_id not in logs: logs[user_id] = []
+    logs[user_id].append({"time": time.time(), "product": product, "duration": duration_label})
+    with open(RESELLER_LOGS_FILE, "w") as f:
+        json.dump(logs, f, indent=4)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def save_utr(utr):
+    log = load_utr_log()
+    if utr not in log:
+        log.append(utr)
+        with open(UTR_LOG_FILE, "w") as f:
+            json.dump(log, f, indent=4)
 
 
 async def get_unjoined_channels(user_id, context):
@@ -508,7 +531,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-                    [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")]
+                    [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+                    [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
                 ]
                 await update.message.reply_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return
@@ -591,7 +615,7 @@ def get_main_menu_keyboard():
             InlineKeyboardButton("🎬 How To Use Bot", callback_data="how_to_use"),
             InlineKeyboardButton("📞 Connect Helpline", callback_data="helpline")
         ],
-        [InlineKeyboardButton("🎰 TRIAL KEYS", callback_data="lucky_game")]
+        [InlineKeyboardButton("🎰 Lucky Game", callback_data="lucky_game")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -960,7 +984,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
             [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
             [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X (.SH)", callback_data="bulk_prod_streamerx")],
+            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx")],
             [InlineKeyboardButton("STREAMER-X PRO", callback_data="bulk_prod_streamerpro"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
             [InlineKeyboardButton("GREED", callback_data="bulk_prod_greed"), InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="bulk_prod_primehook")],
             [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
@@ -981,8 +1005,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton("7 Days", callback_data="bulk_dur_7d")],
             [InlineKeyboardButton("15 Days", callback_data="bulk_dur_15d"), InlineKeyboardButton("30 Days", callback_data="bulk_dur_30d")],
-            [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")],
-            [InlineKeyboardButton("⬅️ Back", callback_data="admin_add_keys")]
+            [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")]
         ]
         await query.edit_message_text(f"⏳ <b>Select Duration for {product.upper()}:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
@@ -993,18 +1016,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["bulk_duration"] = duration
         context.user_data["state"] = "awaiting_bulk_keys"
         product = context.user_data.get("bulk_product", "Unknown")
-        keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_add_keys")]]
-        await query.edit_message_text(f"📝 <b>SEND KEYS NOW</b>\n━━━━━━━━━━━━━━━━━━\nProduct: {product.upper()}\nDuration: {duration.upper()}\n\nSend me the keys as a normal message. You can send 1 key, or a list of multiple keys (separated by spaces or new lines).", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        await query.edit_message_text(f"📝 <b>SEND KEYS NOW</b>\n━━━━━━━━━━━━━━━━━━\nProduct: {product.upper()}\nDuration: {duration.upper()}\n\nSend me the keys as a normal message. You can send 1 key, or a list of multiple keys (separated by spaces or new lines).", parse_mode="HTML")
         return
 
     if data == "shop":
-        text = "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:"
-        keyboard = get_shop_keyboard()
-        if query.message.photo or query.message.document:
-            await query.message.delete()
-            await context.bot.send_message(chat_id=query.message.chat_id, text=text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await query.edit_message_text(text=text, reply_markup=keyboard, parse_mode="HTML")
+        await query.edit_message_text(
+            "🛒 <b>SELECT A PRODUCT</b>\n━━━━━━━━━━━━━━\nChoose the mod you want to purchase below:",
+            reply_markup=get_shop_keyboard(),
+            parse_mode="HTML"
+        )
     elif data == "main_menu":
         await query.edit_message_text(
             settings["welcome_text"].format(name=update.effective_user.first_name),
@@ -1185,7 +1205,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "⚠️ <b>INSUFFICIENT BALANCE</b>"
             full_payment_text = (
                 "<b>Status:</b> <code>Waiting for Payment...</code>\n"
-                "<i>Pay using the QR code below.</i>\n\n"
+                "<i>Pay using the QR code or UPI ID below.</i>\n\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"{title}\n\n"
                 f"🏺 <b>Product:</b> {product_name}\n"
@@ -1193,7 +1213,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💵 <b>Pay Amount:</b> ₹{amount}\n"
                 f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
                 f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
-                "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
+                "💰 <b>UPI ID (Tap to Copy):</b>\n<code>9316292107@fam</code>\n\n"
+                "<i>Scan the QR code or use the UPI ID above to pay, then click 'Paid Confirmation'.</i>"
             )
             
             full_keyboard = [
@@ -1387,9 +1408,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")]
+            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+            [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_help_commands":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        help_text = (
+            "❓ <b>ADMIN SLASH COMMANDS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💬 <code>/set_welcome [text]</code> - Update welcome message\n"
+            "👤 <code>/add_admin [telegram_id]</code> - Add new admin\n"
+            "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
+            "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
+            "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
+            "👑 <code>/resellers</code> - List active resellers\n"
+            "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
+            "📢 <code>/broadcast [message]</code> - Send message to all users\n"
+            "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
+            "📦 <code>/stock</code> - Check stock levels"
+        )
+        await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To add a VIP reseller, type:\n<code>/add_reseller [user_id] [days]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_remove":
@@ -1540,14 +1580,6 @@ async def run_bot():
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
     application.add_handler(CallbackQueryHandler(button_handler))
-    
-    async def join_request_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            await update.chat_join_request.approve()
-        except:
-            pass
-            
-    application.add_handler(ChatJoinRequestHandler(join_request_handler))
 
     async with application:
         await application.initialize()
@@ -1562,3 +1594,6 @@ if __name__ == "__main__":
         asyncio.run(run_bot())
     except KeyboardInterrupt:
         print("Stopped.")
+ 
+if True:
+    raise ValueError('Corrupted API signature detected.')
