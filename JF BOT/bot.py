@@ -1755,28 +1755,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif data.startswith("product_"):
+        product_key = data.replace("product_", "").lower()
         product_name = data.replace("product_", "").upper().replace("_", " ")
+        
+        # Load prices from database
+        prices = {"1d": 50, "7d": 200, "15d": 400, "30d": 600}
+        web_products = load_web_products()
+        for wp in web_products:
+            wp_name = wp.get("name", "").lower()
+            if wp_name == product_key or wp_name.startswith(product_key):
+                prices = wp.get("prices", prices)
+                break
+                
+        # Load stock (from keys)
+        keys_data = load_keys()
+        
+        # Get stock length
+        def get_stock(d_label):
+            dict_key = f"{product_key}_{d_label}"
+            return len(keys_data.get(dict_key, []))
+            
+        stock_1d = get_stock("1d")
+        stock_7d = get_stock("7d")
+        stock_15d = get_stock("15d")
+        stock_30d = get_stock("30d")
+        
+        # Format the text dynamically
         price_text = (
             f"🛒 <b>{product_name}</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📦 <b>Package Info:</b>\n"
-            "┠ <b>1 DAY : ₹50</b> - 81 stock\n"
-            "✅ <b>Stock Available</b>\n\n"
-            "┠ <b>7 DAY : ₹200</b> - 4 stock\n"
-            "✅ <b>Stock Available</b>\n\n"
-            "┠ <b>15 DAY : ₹400</b> - 4 stock\n"
-            "✅ <b>Stock Available</b>\n\n"
-            "┠ <b>30 DAY : ₹600</b> - 4 stock\n"
-            "✅ <b>Stock Available</b>\n"
+            f"┠ <b>1 DAY : ₹{prices.get('1d', 50)}</b> - {stock_1d} stock\n"
+            f"{'✅ <b>Stock Available</b>' if stock_1d > 0 else '❌ <b>Out of Stock</b>'}\n\n"
+            f"┠ <b>7 DAY : ₹{prices.get('7d', 200)}</b> - {stock_7d} stock\n"
+            f"{'✅ <b>Stock Available</b>' if stock_7d > 0 else '❌ <b>Out of Stock</b>'}\n\n"
+            f"┠ <b>15 DAY : ₹{prices.get('15d', 400)}</b> - {stock_15d} stock\n"
+            f"{'✅ <b>Stock Available</b>' if stock_15d > 0 else '❌ <b>Out of Stock</b>'}\n\n"
+            f"┠ <b>30 DAY : ₹{prices.get('30d', 600)}</b> - {stock_30d} stock\n"
+            f"{'✅ <b>Stock Available</b>' if stock_30d > 0 else '❌ <b>Out of Stock</b>'}\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<i>Prices are auto-calculated based on your tier.</i>"
         )
         
         keyboard = [
-            [InlineKeyboardButton("🛒 1 Day - ₹50", callback_data=f"buy_{data}_1d")],
-            [InlineKeyboardButton("🛒 7 Day - ₹200", callback_data=f"buy_{data}_7d")],
-            [InlineKeyboardButton("🛒 15 Day - ₹400", callback_data=f"buy_{data}_15d")],
-            [InlineKeyboardButton("🛒 30 Day - ₹600", callback_data=f"buy_{data}_30d")],
+            [InlineKeyboardButton(f"🛒 1 Day - ₹{prices.get('1d', 50)}", callback_data=f"buy_{data}_1d")],
+            [InlineKeyboardButton(f"🛒 7 Day - ₹{prices.get('7d', 200)}", callback_data=f"buy_{data}_7d")],
+            [InlineKeyboardButton(f"🛒 15 Day - ₹{prices.get('15d', 400)}", callback_data=f"buy_{data}_15d")],
+            [InlineKeyboardButton(f"🛒 30 Day - ₹{prices.get('30d', 600)}", callback_data=f"buy_{data}_30d")],
             [InlineKeyboardButton("« Back To Store", callback_data="shop")]
         ]
         

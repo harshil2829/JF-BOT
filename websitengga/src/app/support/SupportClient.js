@@ -5,10 +5,6 @@ import { Plus, Users, User, MessageCircle, Clock, Search, Download, X } from 'lu
 import { addStaff } from '../actions';
 import { useRouter } from 'next/navigation';
 
-export default function SupportClient({ initialStaff }) {
-  const [staffList, setStaffList] = useState(initialStaff || []);
-  const router = useRouter();
-
 function StaffModal({ isOpen, onClose, onSave }) {
   const [name, setName] = useState('');
   const [telegramId, setTelegramId] = useState('');

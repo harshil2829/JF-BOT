@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { Search, Key, Plus, Trash2, X } from 'lucide-react';
 import { addKeys } from '../actions';
