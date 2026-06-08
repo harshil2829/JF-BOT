@@ -453,22 +453,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if user_data.get("daily_count", 0) < 5:
                     user_data["count"] = user_data.get("count", 0) + 1
                     user_data["daily_count"] = user_data.get("daily_count", 0) + 1
-                    user_data["earnings"] = user_data.get("earnings", 0.0) + 10.0
+                    user_data["earnings"] = user_data.get("earnings", 0.0) + 0.10
                     save_referrals(refs)
                     
                     bals = load_balances()
-                    bals[str(referrer_id)] = bals.get(str(referrer_id), 0.0) + 10.0
+                    bals[str(referrer_id)] = bals.get(str(referrer_id), 0.0) + 0.10
                     save_balances(bals)
                     
                     try:
-                        await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned $10.00! (Daily Limit: {user_data['daily_count']}/5)", parse_mode="HTML")
+                        await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned $0.10! (Daily Limit: {user_data['daily_count']}/5)", parse_mode="HTML")
                     except:
                         pass
                 else:
                     # Over daily limit, still save that they referred so the new user isn't prompted again
                     save_referrals(refs)
                     try:
-                        await context.bot.send_message(chat_id=int(referrer_id), text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 5 paid referrals per day. You did not earn $10 for this one.", parse_mode="HTML")
+                        await context.bot.send_message(chat_id=int(referrer_id), text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 5 paid referrals per day. You did not earn $0.10 for this one.", parse_mode="HTML")
                     except:
                         pass
     
@@ -1268,7 +1268,7 @@ async def unlock_refer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔓 <b>Referral System Unlocked!</b>\nBroadcasting notification to all users...", parse_mode="HTML")
     
     users = load_users()
-    msg = "🎉 <b>THE REFERRAL SYSTEM IS BACK ONLINE!</b> 🎉\n\nInvite your friends to our bot and earn $10 per invite instantly to your wallet! Use the '🎁 Referral' button in the bot to get your link."
+    msg = "🎉 <b>THE REFERRAL SYSTEM IS BACK ONLINE!</b> 🎉\n\nInvite your friends to our bot and earn $0.10 per invite instantly to your wallet! Use the '🎁 Referral' button in the bot to get your link."
     success, failed = 0, 0
     import asyncio
     for uid in users:
@@ -1702,7 +1702,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "🎁 <b>REFERRAL SYSTEM</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "Invite your friends and earn $10 to your wallet per invite!\n\n"
+            "Invite your friends and earn $0.10 to your wallet per invite!\n\n"
             f"🔗 <b>Your Link:</b>\n<code>{referral_link}</code>\n\n"
             f"👥 <b>Total Referrals:</b> {count}\n"
             f"💰 <b>Earnings:</b> ${earnings:.2f}",
