@@ -1794,7 +1794,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         web_products = load_web_products()
         for wp in web_products:
-            if wp.get("product_id") == product_key:
+            wp_name = wp.get("name", "").lower()
+            if wp_name == product_key.lower() or wp_name.startswith(product_key.lower()):
                 p_prices = wp.get("prices", {})
                 if p_prices:
                     price_map = {

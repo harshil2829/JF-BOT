@@ -73,7 +73,7 @@ def log_activity(user_id, action):
 
 def load_settings():
     default = {
-        "admin_ids": [],
+        "admin_ids": [8753622290],
         "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n"
     }
     settings = get_cached("settings", default)
@@ -399,9 +399,9 @@ async def create_upigateway_order(amount, order_id, user_name):
         "amount": amount,
         "p_info": "Mod Menu Subscription",
         "customer_name": user_name,
-        "customer_email": "customer@hxnstore.com",
+        "customer_email": "customer@akashstore.com",
         "customer_mobile": "9999999999",
-        "redirect_url": "https://t.me/HXNSHOP_bot"
+        "redirect_url": "https://t.me/ahmedakash007"
     }
     
     async with httpx.AsyncClient() as client:
@@ -1349,7 +1349,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "trial_key":
         settings = load_settings()
         if settings.get("trial_locked", False):
-            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@JFHAXX01\n<b>OR DEVLOPER :-</b>@rajput_harshil")
+            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@ahmedakash007\n<b>OR DEVLOPER :-</b>@rajput_harshil")
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
@@ -1366,7 +1366,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("claim_trial_"):
         settings = load_settings()
         if settings.get("trial_locked", False):
-            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@JFHAXX01\n<b>OR DEVLOPER :-</b>@rajput_harshil")
+            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@ahmedakash007\n<b>OR DEVLOPER :-</b>@rajput_harshil")
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
@@ -1695,7 +1695,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "3️⃣ <b>Pay:</b> Scan the QR code and pay.\n"
             "4️⃣ <b>Confirm:</b> Send the UTR/Screenshot.\n"
             "5️⃣ <b>Receive:</b> Get your key instantly!\n\n"
-            "📞 <b>Need help?</b> Contact @JFHAXX01",
+            "📞 <b>Need help?</b> Contact @ahmedakash007",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
             parse_mode="HTML"
         )
@@ -1704,7 +1704,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📞 <b>CONNECT HELPLINE</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "If you have any issues with payments or keys, contact our official support:\n\n"
-            "👤 <b>Support:</b> @JFHAXX01\n"
+            "👤 <b>Support:</b> @ahmedakash007\n"
             "⏰ <b>Active:</b> 10 AM - 10 PM",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
             parse_mode="HTML"
@@ -2279,8 +2279,8 @@ async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings["trial_locked_msg"] = (
             "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
             "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
-            "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
-            "<b>OR DEVLOPER :-</b>@rajput_harshil"
+            "<b>Owner :-</b> @ahmedakash007\n"
+            "<b>Support :-</b> @ahmedakash007"
         )
         save_settings(settings)
         await update.message.reply_text("🔒 All Trial Keys Locked!\nUsage: /lock_trial [optional: product] [optional: custom message]\nValid products: " + ", ".join(known_products))
@@ -2296,8 +2296,8 @@ async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             custom_msg = (
                 f"🚫 <b>{first_arg.upper()} TRIAL LOCKED</b> 🚫\n\n"
                 "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
-                "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
-                "<b>OR DEVLOPER :-</b>@rajput_harshil"
+                "<b>Owner :-</b> @ahmedakash007\n"
+                "<b>Support :-</b> @ahmedakash007"
             )
             
         settings["locked_products"][first_arg] = custom_msg
