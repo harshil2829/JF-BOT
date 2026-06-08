@@ -1332,30 +1332,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
             
-        web_products = load_web_products()
-        all_buttons = []
-        for wp in web_products:
-            name = wp.get("name", "")
-            if not name:
-                continue
-            if wp.get("status", "Active") != "Active":
-                continue
-            section = wp.get("section", "Both")
-            if section not in ["Both", "Trial"]:
-                continue
-            
-            display_name = name.upper().replace("_", " ")
-            all_buttons.append(InlineKeyboardButton(display_name, callback_data=f"claim_trial_{name.lower()}"))
-            
-        if not all_buttons:
-            defaults = ["hxn", "lk", "hex", "alpha", "boyyah", "ngo", "greed", "streamerx", "brmods"]
-            for d in defaults:
-                all_buttons.append(InlineKeyboardButton(d.upper(), callback_data=f"claim_trial_{d}"))
-                
-        keyboard = []
-        for i in range(0, len(all_buttons), 2):
-            keyboard.append(all_buttons[i:i+2])
-        keyboard.append([InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")])
+        keyboard = [
+            [InlineKeyboardButton("🎁 ALPHA-X STORE", callback_data="claim_trial_alphax")],
+            [InlineKeyboardButton("🎁 LK TEAM", callback_data="claim_trial_lkteam")],
+            [InlineKeyboardButton("🎁 BR MODS", callback_data="claim_trial_brmods")],
+            [InlineKeyboardButton("🎁 HEX BLADE", callback_data="claim_trial_hexblade")],
+            [InlineKeyboardButton("« Back", callback_data="main_menu")]
+        ]
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
