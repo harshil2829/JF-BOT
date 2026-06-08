@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 # CONFIGURATION
 TOKEN = "8821407634:AAENJNHB7JVdc4FamhOmFsgkhX-WS5K7j7k"
-UPI_GATEWAY_TOKEN = "8821407634:AAENJNHB7JVdc4FamhOmFsgkhX-WS5K7j7k" 
-IS_AUTO_MODE = False
+UPI_GATEWAY_TOKEN = "BXxPjJ06479522753988" 
+IS_AUTO_MODE = True
 
 import time
 _CACHE = {}
@@ -623,10 +623,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 2. Check if Auto-Mode is ON
         if IS_AUTO_MODE and utr and utr.isdigit() and len(utr) == 12:
             status_msg = await update.message.reply_text("⏳ <b>Verifying your payment...</b> Please wait.", parse_mode="HTML")
-            api_status = await verify_utr_api(utr, amount)
+            api_status = await verify_utr_api(order_id, amount)
             
             if api_status == "success":
                 save_utr(utr)
+                context.user_data["state"] = None
+                context.user_data["order_id"] = None
                 # Delivery Key
                 keys = load_keys()
                 prod_key = product.lower()
@@ -1603,24 +1605,84 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         method = parts[1]
         order_id = parts[2]
-        amount_usd = context.user_data.get("balance_amount", 0)
+        amount_val = context.user_data.get("balance_amount") or context.user_data.get("amount") or 0.0
+        amount_usd = float(amount_val)
         amount_bdt = amount_usd * 120
         
         if method == "binance":
             pay_details = f"<b>Binance ID:</b> <code>781257349</code>\n<b>Amount:</b> ${amount_usd:.2f}"
+            msg = (
+                f"💳 <b>PAYMENT DETAILS ({method.upper()})</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{pay_details}\n\n"
+                f"<i>After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
+            )
+            context.user_data["state"] = "awaiting_receipt"
+            await query.edit_message_text(msg, parse_mode="HTML")
         elif method == "bkash":
             pay_details = f"<b>bKash Personal:</b> <code>01874640097</code>\n<b>Amount:</b> ৳{amount_bdt:.2f}"
+            msg = (
+                f"💳 <b>PAYMENT DETAILS ({method.upper()})</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{pay_details}\n\n"
+                f"<i>After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
+            )
+            context.user_data["state"] = "awaiting_receipt"
+            await query.edit_message_text(msg, parse_mode="HTML")
         elif method == "upi":
-            pay_details = f"<b>UPI:</b> <code>paytm.s1xzhpw@pty</code>\n<b>Amount:</b> ${amount_usd:.2f}"
+            payment_url = await create_upigateway_order(amount_usd, order_id, query.from_user.first_name)
+            pay_details = f"<b>UPI ID:</b> <code>paytm.s1xzhpw@pty</code>\n"
+            pay_details += f"<b>Amount:</b> ${amount_usd:.2f}\n"
+            if payment_url:
+                pay_details += f"🔗 <b>Payment Link:</b> <a href=\"{payment_url}\">Click here to Pay</a>\n"
+                
+            msg = (
+                f"💳 <b>UPI PAYMENT (INDIA)</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{pay_details}\n"
+                f"⏳ <b>Time Limit:</b> 5 Minutes\n\n"
+                f"<i>Please make your payment within 5 minutes. After paying, send your 12-digit UTR/Transaction ID here to confirm.</i>"
+            )
+            context.user_data["state"] = "awaiting_receipt"
+            context.user_data["order_id"] = order_id
+            await query.edit_message_text(msg, parse_mode="HTML")
             
-        msg = (
-            f"💳 <b>PAYMENT DETAILS ({method.upper()})</b>\n"
+            async def run_upi_timer():
+                await asyncio.sleep(300)
+                if context.user_data.get("order_id") == order_id and context.user_data.get("state") == "awaiting_receipt":
+                    status = await verify_utr_api(order_id, amount_usd)
+                    if status != "success":
+                        context.user_data["state"] = None
+                        context.user_data["order_id"] = None
+                        try:
+                            await context.bot.send_message(
+                                chat_id=query.message.chat_id,
+                                text=f"❌ <b>PAYMENT REJECTED</b>\n━━━━━━━━━━━━━━━━━━\nOrder ID: <code>{order_id}</code>\n\nTime limit of 5 minutes has expired. Your payment request has been automatically rejected.",
+                                parse_mode="HTML"
+                            )
+                        except:
+                            pass
+            asyncio.create_task(run_upi_timer())
+
+    elif data.startswith("choosepay_"):
+        order_id = data.split("_")[1]
+        amount_val = context.user_data.get("balance_amount") or context.user_data.get("amount") or 0.0
+        amount = float(amount_val)
+        keyboard = [
+            [InlineKeyboardButton("🌍 Global (Binance)", callback_data=f"pay_binance_{order_id}")],
+            [InlineKeyboardButton("🇧🇩 Bangladesh (bKash)", callback_data=f"pay_bkash_{order_id}")],
+            [InlineKeyboardButton("🇮🇳 India (UPI)", callback_data=f"pay_upi_{order_id}")],
+            [InlineKeyboardButton("« Back to Store", callback_data="shop")]
+        ]
+        await query.edit_message_text(
+            f"💳 <b>SELECT MANUAL PAYMENT METHOD</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"{pay_details}\n\n"
-            f"<i>After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
+            f"💵 <b>Amount:</b> ${amount:.2f}\n"
+            f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+            f"Choose your payment method below:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
         )
-        context.user_data["state"] = "awaiting_receipt"
-        await query.edit_message_text(msg, parse_mode="HTML")
 
     elif data == "history":
         logs = load_user_history(query.from_user.id)
