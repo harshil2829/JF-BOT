@@ -22,10 +22,13 @@ if __name__ == "__main__":
     print("Starting Telegram Bots...")
     p1 = subprocess.Popen(["python3", "bot.py"], cwd="tele")
     p2 = subprocess.Popen(["python3", "bot.py"], cwd="JF BOT")
+    p3 = subprocess.Popen(["python3", "bot.py"], cwd="NewClientBot")
     
     try:
         p1.wait()
         p2.wait()
+        p3.wait()
     except KeyboardInterrupt:
         p1.terminate()
         p2.terminate()
+        p3.terminate()
