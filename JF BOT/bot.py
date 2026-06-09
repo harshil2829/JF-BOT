@@ -2466,12 +2466,48 @@ async def rperms_cmd(update, context):
     save_reseller_perms(perms)
     await update.message.reply_text(f"✅ Permissions updated for reseller {target_id}.\nAllowed: {perms[target_id]}")
 
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id in settings["admin_ids"]:
+        help_text = (
+            "❓ <b>ADMIN SLASH COMMANDS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💬 <code>/set_welcome [text]</code> - Update welcome message\n"
+            "👤 <code>/add_admin [telegram_id]</code> - Add new admin\n"
+            "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
+            "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
+            "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
+            "👑 <code>/resellers</code> - List active resellers\n"
+            "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
+            "📢 <code>/broadcast [message]</code> (or /bc) - Send message to all users\n"
+            "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
+            "📦 <code>/stock</code> - Check stock levels\n"
+            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials\n"
+            "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
+            "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
+            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions\n"
+            "🔒 <code>/lock_wallet</code> - Lock wallet buy for normal users\n"
+            "🔓 <code>/unlock_wallet</code> - Unlock wallet buy for normal users"
+        )
+        await update.message.reply_text(help_text, parse_mode="HTML")
+    else:
+        help_text = (
+            "ℹ️ <b>STORE HELPLINE</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "Use the menu buttons below to navigate the shop.\n\n"
+            "👤 <b>Support:</b> @JFHAXX01\n"
+            "📢 <b>Join Channel:</b> https://t.me/JFFREEAPK"
+        )
+        await update.message.reply_text(help_text, parse_mode="HTML")
+
 async def run_bot():
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_my_id))
+    application.add_handler(CommandHandler("help", help_cmd))
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("set_welcome", set_welcome))
     application.add_handler(CommandHandler("add_admin", add_admin))
