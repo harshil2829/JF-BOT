@@ -1366,18 +1366,36 @@ async def lock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     if user_id not in settings["admin_ids"]: return
     
-    settings["wallet_buy_locked"] = True
-    save_settings(settings)
-    await update.message.reply_text("🔒 <b>Wallet purchases have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
+    if context.args:
+        product = context.args[0].lower().strip()
+        if "wallet_locked_products" not in settings or not isinstance(settings["wallet_locked_products"], list):
+            settings["wallet_locked_products"] = []
+        if product not in settings["wallet_locked_products"]:
+            settings["wallet_locked_products"].append(product)
+        save_settings(settings)
+        await update.message.reply_text(f"🔒 <b>Wallet purchases for '{product.upper()}' have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
+    else:
+        settings["wallet_buy_locked"] = True
+        save_settings(settings)
+        await update.message.reply_text("🔒 <b>All wallet purchases have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
 
 async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
     if user_id not in settings["admin_ids"]: return
     
-    settings["wallet_buy_locked"] = False
-    save_settings(settings)
-    await update.message.reply_text("🔓 <b>Wallet purchases have been unlocked for all users!</b>", parse_mode="HTML")
+    if context.args:
+        product = context.args[0].lower().strip()
+        if "wallet_locked_products" in settings and isinstance(settings["wallet_locked_products"], list):
+            if product in settings["wallet_locked_products"]:
+                settings["wallet_locked_products"].remove(product)
+                save_settings(settings)
+        await update.message.reply_text(f"🔓 <b>Wallet purchases for '{product.upper()}' have been unlocked!</b>", parse_mode="HTML")
+    else:
+        settings["wallet_buy_locked"] = False
+        settings["wallet_locked_products"] = []
+        save_settings(settings)
+        await update.message.reply_text("🔓 <b>All wallet purchases have been unlocked!</b>", parse_mode="HTML")
 
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1879,12 +1897,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_bal >= float_amount:
             settings = load_settings()
             wallet_locked = settings.get("wallet_buy_locked", False)
-            if wallet_locked and not is_reseller:
+            locked_prods = settings.get("wallet_locked_products", [])
+            product_locked = product_key.lower() in [p.lower() for p in locked_prods]
+            if (wallet_locked or product_locked) and not is_reseller:
                 title = "❌ <b>WALLET PURCHASE DISABLED</b>"
                 full_payment_text = (
                     "<b>Status:</b> <code>Wallet Disabled</code>\n"
                     "━━━━━━━━━━━━━━━━━━\n"
-                    "⚠️ <i>Wallet payments are temporarily disabled for normal users by Admin. Please pay using the QR code below.</i>\n\n"
+                    "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>\n\n"
                     f"{title}\n\n"
                     f"🏺 <b>Product:</b> {product_name}\n"
                     f"⏳ <b>Duration:</b> {days}\n"
@@ -1978,8 +1998,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resellers = load_resellers()
             is_reseller = user_id_str in resellers and time.time() < resellers[user_id_str]
             settings = load_settings()
-            if settings.get("wallet_buy_locked", False) and not is_reseller:
-                await query.answer("🚫 Wallet purchase is currently disabled for normal users by the Admin.", show_alert=True)
+            product = context.user_data.get("product", "hxn").lower()
+            wallet_locked = settings.get("wallet_buy_locked", False)
+            locked_prods = settings.get("wallet_locked_products", [])
+            product_locked = product in [p.lower() for p in locked_prods]
+            if (wallet_locked or product_locked) and not is_reseller:
+                await query.answer("🚫 Wallet purchase is currently disabled for this product for normal users by the Admin.", show_alert=True)
                 return
             order_id = data.split("_")[1]
             if context.user_data.get(f"processed_{order_id}"):
@@ -2238,8 +2262,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
             "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
             "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions\n"
-            "🔒 <code>/lock_wallet</code> - Lock wallet buy for normal users\n"
-            "🔓 <code>/unlock_wallet</code> - Unlock wallet buy for normal users"
+            "🔒 <code>/lock_wallet [optional: product]</code> - Lock wallet buy for normal users\n"
+            "🔓 <code>/unlock_wallet [optional: product]</code> - Unlock wallet buy for normal users"
         )
         await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
@@ -2512,8 +2536,8 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
             "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
             "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions\n"
-            "🔒 <code>/lock_wallet</code> - Lock wallet buy for normal users\n"
-            "🔓 <code>/unlock_wallet</code> - Unlock wallet buy for normal users"
+            "🔒 <code>/lock_wallet [optional: product]</code> - Lock wallet buy for normal users\n"
+            "🔓 <code>/unlock_wallet [optional: product]</code> - Unlock wallet buy for normal users"
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
     else:
