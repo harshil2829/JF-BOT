@@ -1361,6 +1361,24 @@ async def unlock_refer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(0.05)
     await update.message.reply_text(f"✅ <b>Broadcast Complete!</b>\nSent to: {success}\nFailed: {failed}", parse_mode="HTML")
 
+async def lock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    settings["wallet_buy_locked"] = True
+    save_settings(settings)
+    await update.message.reply_text("🔒 <b>Wallet purchases have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
+
+async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    settings["wallet_buy_locked"] = False
+    save_settings(settings)
+    await update.message.reply_text("🔓 <b>Wallet purchases have been unlocked for all users!</b>", parse_mode="HTML")
+
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -1859,28 +1877,64 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.delete()
         
         if user_bal >= float_amount:
-            title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
-            full_payment_text = (
-                "<b>Status:</b> <code>Ready to Checkout</code>\n"
-                "<i>Pay using your Wallet Balance.</i>\n\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"{title}\n\n"
-                f"🏺 <b>Product:</b> {product_name}\n"
-                f"⏳ <b>Duration:</b> {days}\n"
-                f"💵 <b>Pay Amount:</b> ₹{amount}\n"
-                f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n\n"
-                "<i>Click '💰 Pay with Wallet' to buy instantly.</i>"
-            )
-            full_keyboard = [
-                [InlineKeyboardButton("💰 Pay with Wallet", callback_data=f"walletpay_{order_id}")],
-                [InlineKeyboardButton("« Back to Store", callback_data="shop")]
-            ]
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=full_payment_text,
-                reply_markup=InlineKeyboardMarkup(full_keyboard),
-                parse_mode="HTML"
-            )
+            settings = load_settings()
+            wallet_locked = settings.get("wallet_buy_locked", False)
+            if wallet_locked and not is_reseller:
+                title = "❌ <b>WALLET PURCHASE DISABLED</b>"
+                full_payment_text = (
+                    "<b>Status:</b> <code>Wallet Disabled</code>\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    "⚠️ <i>Wallet payments are temporarily disabled for normal users by Admin. Please pay using the QR code below.</i>\n\n"
+                    f"{title}\n\n"
+                    f"🏺 <b>Product:</b> {product_name}\n"
+                    f"⏳ <b>Duration:</b> {days}\n"
+                    f"💵 <b>Pay Amount:</b> ₹{amount}\n"
+                    f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
+                    f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
+                    "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
+                )
+                full_keyboard = [
+                    [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"confirm_{order_id}")],
+                    [InlineKeyboardButton("« Back to Store", callback_data="shop")]
+                ]
+                if os.path.exists("qr.png"):
+                    await context.bot.send_photo(
+                        chat_id=query.message.chat_id,
+                        photo=open("qr.png", "rb"),
+                        caption=full_payment_text,
+                        reply_markup=InlineKeyboardMarkup(full_keyboard),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=query.message.chat_id,
+                        text=full_payment_text + "\n\n⚠️ <i>(QR Code image missing on server)</i>",
+                        reply_markup=InlineKeyboardMarkup(full_keyboard),
+                        parse_mode="HTML"
+                    )
+            else:
+                title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
+                full_payment_text = (
+                    "<b>Status:</b> <code>Ready to Checkout</code>\n"
+                    "<i>Pay using your Wallet Balance.</i>\n\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    f"{title}\n\n"
+                    f"🏺 <b>Product:</b> {product_name}\n"
+                    f"⏳ <b>Duration:</b> {days}\n"
+                    f"💵 <b>Pay Amount:</b> ₹{amount}\n"
+                    f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n\n"
+                    "<i>Click '💰 Pay with Wallet' to buy instantly.</i>"
+                )
+                full_keyboard = [
+                    [InlineKeyboardButton("💰 Pay with Wallet", callback_data=f"walletpay_{order_id}")],
+                    [InlineKeyboardButton("« Back to Store", callback_data="shop")]
+                ]
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text=full_payment_text,
+                    reply_markup=InlineKeyboardMarkup(full_keyboard),
+                    parse_mode="HTML"
+                )
         else:
             title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "⚠️ <b>INSUFFICIENT BALANCE</b>"
             full_payment_text = (
@@ -1920,6 +1974,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("walletpay_"):
         try:
             debug_log(f"Clicked walletpay: {data}")
+            user_id_str = str(query.from_user.id)
+            resellers = load_resellers()
+            is_reseller = user_id_str in resellers and time.time() < resellers[user_id_str]
+            settings = load_settings()
+            if settings.get("wallet_buy_locked", False) and not is_reseller:
+                await query.answer("🚫 Wallet purchase is currently disabled for normal users by the Admin.", show_alert=True)
+                return
             order_id = data.split("_")[1]
             if context.user_data.get(f"processed_{order_id}"):
                 await query.answer("Processing...", show_alert=False)
@@ -2438,6 +2499,8 @@ async def run_bot():
     application.add_handler(CommandHandler("reset_trial", reset_trial))
     application.add_handler(CommandHandler("lock_trial", lock_trial_cmd))
     application.add_handler(CommandHandler("unlock_trial", unlock_trial_cmd))
+    application.add_handler(CommandHandler("lock_wallet", lock_wallet_cmd))
+    application.add_handler(CommandHandler("unlock_wallet", unlock_wallet_cmd))
     
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
