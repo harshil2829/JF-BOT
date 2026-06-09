@@ -125,11 +125,30 @@ def load_users():
     doc = jf_col.find_one({"_id": "users"})
     return doc["data"] if doc else []
 
-def save_user(user_id):
+def save_user(user_id, username=None):
     users = load_users()
     if user_id not in users:
         users.append(user_id)
         jf_col.update_one({"_id": "users"}, {"$set": {"data": users}}, upsert=True)
+    if username:
+        save_username_mapping(user_id, username)
+
+def save_username_mapping(user_id, username):
+    if not username: return
+    user_id = str(user_id)
+    username = username.lower().replace("@", "").strip()
+    
+    doc = jf_col.find_one({"_id": "username_mappings"})
+    mappings = doc["data"] if doc else {}
+    if mappings.get(username) != user_id:
+        mappings[username] = user_id
+        jf_col.update_one({"_id": "username_mappings"}, {"$set": {"data": mappings}}, upsert=True)
+
+def get_user_id_by_username(username):
+    username = username.lower().replace("@", "").strip()
+    doc = jf_col.find_one({"_id": "username_mappings"})
+    mappings = doc["data"] if doc else {}
+    return mappings.get(username)
 
 def load_verified_users():
     doc = jf_col.find_one({"_id": "verified_users"})
@@ -198,6 +217,13 @@ def load_reseller_perms():
 
 def save_reseller_perms(perms):
     jf_col.update_one({"_id": "reseller_perms"}, {"$set": {"data": perms}}, upsert=True)
+
+def load_wallet_purchases():
+    doc = jf_col.find_one({"_id": "wallet_purchases"})
+    return doc["data"] if doc else {}
+
+def save_wallet_purchases(data):
+    jf_col.update_one({"_id": "wallet_purchases"}, {"$set": {"data": data}}, upsert=True)
 
 
 def load_user_history(user_id):
@@ -489,7 +515,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_banned(user_id):
         await update.message.reply_text("🚫 You are banned from this bot for abusing the trial system.")
         return
-    save_user(user_id)
+    save_user(user_id, update.effective_user.username)
     log_activity(user_id, 'started the bot')
     
     # Referral System
@@ -585,6 +611,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    if update.effective_user and update.effective_user.username:
+        save_username_mapping(user_id, update.effective_user.username)
     web_settings = load_web_settings()
     web_staff = load_web_staff()
     admin_ids = load_settings().get("admin_ids", [])
@@ -1047,6 +1075,99 @@ async def check_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current = balances.get(target_id, 0.0)
     await update.message.reply_text(f"💰 Balance for user {target_id}: ₹{current:.2f}")
 
+async def check_user_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    if len(context.args) < 1:
+        await update.message.reply_text("Usage: /check_user [user_id_or_username]")
+        return
+        
+    target_input = str(context.args[0]).strip()
+    
+    if target_input.startswith("@") or not target_input.isdigit():
+        username_clean = target_input.replace("@", "").lower().strip()
+        target_id = get_user_id_by_username(username_clean)
+        if not target_id:
+            try:
+                chat = await context.bot.get_chat(f"@{username_clean}")
+                target_id = str(chat.id)
+                save_username_mapping(target_id, username_clean)
+            except Exception as e:
+                await update.message.reply_text(
+                    f"❌ <b>Username Not Found</b>\n"
+                    f"Could not find a user ID associated with @{username_clean}.\n\n"
+                    f"<i>Note: The bot can only find users by username after they have messaged or interacted with the bot.</i>",
+                    parse_mode="HTML"
+                )
+                return
+    else:
+        target_id = target_input
+        
+    balances = load_balances()
+    balance = balances.get(target_id, 0.0)
+    
+    resellers = load_resellers()
+    is_reseller = target_id in resellers
+    reseller_expiry = resellers.get(target_id, 0.0)
+    reseller_status = "❌ No"
+    if is_reseller:
+        if time.time() < reseller_expiry:
+            import datetime
+            exp_date = datetime.datetime.fromtimestamp(reseller_expiry).strftime('%Y-%m-%d %H:%M:%S')
+            reseller_status = f"✅ Yes (Expires: {exp_date})"
+        else:
+            reseller_status = "❌ Expired"
+            
+    perms = load_reseller_perms().get(target_id, [])
+    perms_str = ", ".join(perms) if perms else "None"
+    
+    trials = load_trials()
+    trial_data = trials.get(target_id, {})
+    is_banned = trial_data.get("banned", False)
+    strikes = trial_data.get("strikes", 0)
+    last_trial_time = trial_data.get("last_trial", 0)
+    last_trial_str = "Never"
+    if last_trial_time > 0:
+        import datetime
+        last_trial_str = datetime.datetime.fromtimestamp(last_trial_time).strftime('%Y-%m-%d %H:%M:%S')
+        
+    refs = load_referrals()
+    ref_data = refs.get("users", {}).get(target_id, {"count": 0, "earnings": 0.0})
+    ref_count = ref_data.get("count", 0)
+    ref_earnings = ref_data.get("earnings", 0.0)
+    
+    display_name = "Unknown User"
+    try:
+        chat = await context.bot.get_chat(int(target_id))
+        display_name = chat.first_name
+        if chat.last_name:
+            display_name += f" {chat.last_name}"
+        if chat.username:
+            display_name += f" (@{chat.username})"
+    except:
+        pass
+        
+    user_info_text = (
+        f"👤 <b>USER PROFILE INFO</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Name:</b> {display_name}\n"
+        f"🆔 <b>User ID:</b> <code>{target_id}</code>\n"
+        f"💰 <b>Wallet Balance:</b> ₹{balance:.2f}\n"
+        f"🚫 <b>Banned Status:</b> {'❌ BANNED' if is_banned else '✅ Active'}\n"
+        f"⚠️ <b>Strikes Count:</b> {strikes}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👑 <b>Reseller:</b> {reseller_status}\n"
+        f"🔑 <b>Reseller Permissions:</b> {perms_str}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"🎁 <b>Referred Count:</b> {ref_count} users\n"
+        f"💸 <b>Referral Earnings:</b> ₹{ref_earnings:.2f}\n"
+        f"⏳ <b>Last Trial Claimed:</b> {last_trial_str}\n"
+    )
+    
+    await update.message.reply_text(user_info_text, parse_mode="HTML")
+
 async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -1482,6 +1603,8 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    if update.effective_user and update.effective_user.username:
+        save_username_mapping(update.effective_user.id, update.effective_user.username)
     try:
         await query.answer()
     except:
@@ -1957,12 +2080,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 duration.lower() in locked_prods_lower or
                 f"{product_key.lower()}_{duration.lower()}" in locked_prods_lower
             )
-            if (wallet_locked or product_locked) and not is_reseller:
+            
+            from datetime import datetime
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            wp = load_wallet_purchases()
+            already_bought_today = (wp.get(user_id_str, "") == today_str)
+            
+            if (wallet_locked or product_locked or already_bought_today) and not is_reseller:
                 title = "❌ <b>WALLET PURCHASE DISABLED</b>"
+                reason_msg = "⚠️ <i>You have already purchased 1 key today using Wallet balance. Please pay using the QR code below for additional purchases.</i>" if already_bought_today else "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>"
                 full_payment_text = (
                     "<b>Status:</b> <code>Wallet Disabled</code>\n"
                     "━━━━━━━━━━━━━━━━━━\n"
-                    "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>\n\n"
+                    f"{reason_msg}\n\n"
                     f"{title}\n\n"
                     f"🏺 <b>Product:</b> {product_name}\n"
                     f"⏳ <b>Duration:</b> {days}\n"
@@ -2066,8 +2196,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 duration in locked_prods_lower or
                 f"{product}_{duration}" in locked_prods_lower
             )
-            if (wallet_locked or product_locked) and not is_reseller:
-                await query.answer("🚫 Wallet purchase is currently disabled for this product/duration for normal users by the Admin.", show_alert=True)
+            from datetime import datetime
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            wp = load_wallet_purchases()
+            already_bought_today = (wp.get(user_id_str, "") == today_str)
+            if (wallet_locked or product_locked or already_bought_today) and not is_reseller:
+                await query.answer("🚫 You have already purchased 1 key today using Wallet balance.", show_alert=True)
                 return
             order_id = data.split("_")[1]
             if context.user_data.get(f"processed_{order_id}"):
@@ -2106,6 +2240,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
                 debug_log(f"Delivered key: {delivered_key}")
                 if delivered_key:
+                    # Save wallet purchase today
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    wp = load_wallet_purchases()
+                    wp[user_id_str] = today_str
+                    save_wallet_purchases(wp)
+
                     resellers_check = load_resellers()
                     username_str = f"@{query.from_user.username}" if query.from_user.username else str(query.from_user.first_name)
                 
@@ -2317,6 +2457,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
             "💸 <code>/remove_balance [user_id] [amount]</code> - Deduct balance\n"
             "💳 <code>/check_balance [user_id]</code> - Check user balance\n"
+            "👤 <code>/check_user [user_id_or_username]</code> - View user info profile\n"
             "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
             "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
             "👑 <code>/resellers</code> - List active resellers\n"
@@ -2601,6 +2742,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
             "💸 <code>/remove_balance [user_id] [amount]</code> - Deduct balance\n"
             "💳 <code>/check_balance [user_id]</code> - Check user balance\n"
+            "👤 <code>/check_user [user_id_or_username]</code> - View user info profile\n"
             "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
             "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
             "👑 <code>/resellers</code> - List active resellers\n"
@@ -2653,6 +2795,7 @@ async def run_bot():
     application.add_handler(CommandHandler("unban", unban_cmd))
     application.add_handler(CommandHandler("check_history", check_history_cmd))
     application.add_handler(CommandHandler("check_balance", check_balance_cmd))
+    application.add_handler(CommandHandler("check_user", check_user_cmd))
     application.add_handler(CommandHandler("set_trial_days", set_trial_days_cmd))
     application.add_handler(CommandHandler("remove_balance", remove_balance_cmd))
     application.add_handler(CommandHandler("add_reseller", add_reseller_cmd))
