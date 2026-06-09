@@ -1367,13 +1367,40 @@ async def lock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in settings["admin_ids"]: return
     
     if context.args:
-        product = context.args[0].lower().strip()
+        full_text = " ".join(context.args).lower().strip()
+        raw_parts = [p.strip() for p in full_text.split(",")]
+        
+        targets = []
+        current_product = None
+        for part in raw_parts:
+            if " " in part:
+                sub_parts = part.split()
+                if sub_parts[0] not in ["1d", "7d", "15d", "30d"] and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
+                    current_product = sub_parts[0]
+                    targets.append(f"{sub_parts[0]}_{sub_parts[1]}")
+                else:
+                    targets.append("_".join(sub_parts))
+            else:
+                if "_" in part:
+                    sub_parts = part.split("_")
+                    if len(sub_parts) == 2 and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
+                        current_product = sub_parts[0]
+                    targets.append(part)
+                elif part in ["1d", "7d", "15d", "30d"] and current_product:
+                    targets.append(f"{current_product}_{part}")
+                else:
+                    targets.append(part)
+                    
         if "wallet_locked_products" not in settings or not isinstance(settings["wallet_locked_products"], list):
             settings["wallet_locked_products"] = []
-        if product not in settings["wallet_locked_products"]:
-            settings["wallet_locked_products"].append(product)
+            
+        for target in targets:
+            if target not in settings["wallet_locked_products"]:
+                settings["wallet_locked_products"].append(target)
         save_settings(settings)
-        await update.message.reply_text(f"🔒 <b>Wallet purchases for '{product.upper()}' have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
+        
+        locked_display = ", ".join([t.upper().replace("_", " ") for t in targets])
+        await update.message.reply_text(f"🔒 <b>Wallet purchases for [{locked_display}] have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
     else:
         settings["wallet_buy_locked"] = True
         save_settings(settings)
@@ -1385,12 +1412,38 @@ async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in settings["admin_ids"]: return
     
     if context.args:
-        product = context.args[0].lower().strip()
+        full_text = " ".join(context.args).lower().strip()
+        raw_parts = [p.strip() for p in full_text.split(",")]
+        
+        targets = []
+        current_product = None
+        for part in raw_parts:
+            if " " in part:
+                sub_parts = part.split()
+                if sub_parts[0] not in ["1d", "7d", "15d", "30d"] and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
+                    current_product = sub_parts[0]
+                    targets.append(f"{sub_parts[0]}_{sub_parts[1]}")
+                else:
+                    targets.append("_".join(sub_parts))
+            else:
+                if "_" in part:
+                    sub_parts = part.split("_")
+                    if len(sub_parts) == 2 and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
+                        current_product = sub_parts[0]
+                    targets.append(part)
+                elif part in ["1d", "7d", "15d", "30d"] and current_product:
+                    targets.append(f"{current_product}_{part}")
+                else:
+                    targets.append(part)
+                    
         if "wallet_locked_products" in settings and isinstance(settings["wallet_locked_products"], list):
-            if product in settings["wallet_locked_products"]:
-                settings["wallet_locked_products"].remove(product)
-                save_settings(settings)
-        await update.message.reply_text(f"🔓 <b>Wallet purchases for '{product.upper()}' have been unlocked!</b>", parse_mode="HTML")
+            for target in targets:
+                if target in settings["wallet_locked_products"]:
+                    settings["wallet_locked_products"].remove(target)
+            save_settings(settings)
+            
+        unlocked_display = ", ".join([t.upper().replace("_", " ") for t in targets])
+        await update.message.reply_text(f"🔓 <b>Wallet purchases for [{unlocked_display}] have been unlocked!</b>", parse_mode="HTML")
     else:
         settings["wallet_buy_locked"] = False
         settings["wallet_locked_products"] = []
@@ -1898,7 +1951,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             settings = load_settings()
             wallet_locked = settings.get("wallet_buy_locked", False)
             locked_prods = settings.get("wallet_locked_products", [])
-            product_locked = product_key.lower() in [p.lower() for p in locked_prods]
+            locked_prods_lower = [p.lower() for p in locked_prods]
+            product_locked = (
+                product_key.lower() in locked_prods_lower or
+                duration.lower() in locked_prods_lower or
+                f"{product_key.lower()}_{duration.lower()}" in locked_prods_lower
+            )
             if (wallet_locked or product_locked) and not is_reseller:
                 title = "❌ <b>WALLET PURCHASE DISABLED</b>"
                 full_payment_text = (
@@ -1999,11 +2057,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_reseller = user_id_str in resellers and time.time() < resellers[user_id_str]
             settings = load_settings()
             product = context.user_data.get("product", "hxn").lower()
+            duration = context.user_data.get("duration", "1d").lower()
             wallet_locked = settings.get("wallet_buy_locked", False)
             locked_prods = settings.get("wallet_locked_products", [])
-            product_locked = product in [p.lower() for p in locked_prods]
+            locked_prods_lower = [p.lower() for p in locked_prods]
+            product_locked = (
+                product in locked_prods_lower or
+                duration in locked_prods_lower or
+                f"{product}_{duration}" in locked_prods_lower
+            )
             if (wallet_locked or product_locked) and not is_reseller:
-                await query.answer("🚫 Wallet purchase is currently disabled for this product for normal users by the Admin.", show_alert=True)
+                await query.answer("🚫 Wallet purchase is currently disabled for this product/duration for normal users by the Admin.", show_alert=True)
                 return
             order_id = data.split("_")[1]
             if context.user_data.get(f"processed_{order_id}"):
