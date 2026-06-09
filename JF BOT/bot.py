@@ -2214,9 +2214,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
             [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-            [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")]
+            [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
+            [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_help_commands":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        help_text = (
+            "❓ <b>ADMIN SLASH COMMANDS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💬 <code>/set_welcome [text]</code> - Update welcome message\n"
+            "👤 <code>/add_admin [telegram_id]</code> - Add new admin\n"
+            "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
+            "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
+            "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
+            "👑 <code>/resellers</code> - List active resellers\n"
+            "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
+            "📢 <code>/broadcast [message]</code> (or /bc) - Send message to all users\n"
+            "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
+            "📦 <code>/stock</code> - Check stock levels\n"
+            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials\n"
+            "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
+            "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
+            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions\n"
+            "🔒 <code>/lock_wallet</code> - Lock wallet buy for normal users\n"
+            "🔓 <code>/unlock_wallet</code> - Unlock wallet buy for normal users"
+        )
+        await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To add a VIP reseller, type:\n<code>/add_reseller [user_id] [days]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_remove":
