@@ -225,6 +225,13 @@ def load_wallet_purchases():
 def save_wallet_purchases(data):
     jf_col.update_one({"_id": "wallet_purchases"}, {"$set": {"data": data}}, upsert=True)
 
+def load_order_messages(order_id):
+    doc = jf_col.find_one({"_id": f"ordermsg_{order_id}"})
+    return doc.get("data", {}) if doc else {}
+
+def save_order_messages(order_id, data):
+    jf_col.update_one({"_id": f"ordermsg_{order_id}"}, {"$set": {"data": data}}, upsert=True)
+
 
 def load_user_history(user_id):
     doc = jf_col.find_one({"_id": f"history_{user_id}"})
@@ -700,7 +707,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if state == "awaiting_receipt":
         user = update.effective_user
-        order_id = context.user_data.get("order_id", "Unknown")
+        order_id = context.user_data.get("order_id")
+        if not order_id or order_id == "Unknown":
+            order_id = "OID" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         product = context.user_data.get("product", "Unknown")
         amount = context.user_data.get("amount", "0")
         duration = context.user_data.get("duration", "1d")
@@ -755,18 +764,27 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user.id}_{product}_{order_id}_{duration}"),
-                InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")
+                InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}_{order_id}")
             ]
         ])
         
+        admin_messages = {}
         for admin_id in settings["admin_ids"]:
             try:
                 if update.message.photo:
-                    await context.bot.send_photo(chat_id=admin_id, photo=update.message.photo[-1].file_id, caption=admin_msg, reply_markup=keyboard, parse_mode="HTML")
+                    sent_msg = await context.bot.send_photo(chat_id=admin_id, photo=update.message.photo[-1].file_id, caption=admin_msg, reply_markup=keyboard, parse_mode="HTML")
                 else:
-                    await context.bot.send_message(chat_id=admin_id, text=admin_msg, reply_markup=keyboard, parse_mode="HTML")
+                    sent_msg = await context.bot.send_message(chat_id=admin_id, text=admin_msg, reply_markup=keyboard, parse_mode="HTML")
+                admin_messages[str(admin_id)] = sent_msg.message_id
             except Exception as e:
                 logger.error(f"Could not notify admin {admin_id}: {e}")
+        
+        save_order_messages(order_id, {
+            "status": "pending",
+            "messages": admin_messages,
+            "text": admin_msg,
+            "is_photo": bool(update.message.photo)
+        })
         
         await update.message.reply_text("✅ <b>Receipt Received!</b>\nOur admin is verifying your payment. You will receive your key soon.", parse_mode="HTML")
         context.user_data["state"] = None # Reset state
@@ -1867,21 +1885,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         
         settings = load_settings()
+        admin_messages = {}
+        msg = (
+            "💰 <b>NEW BALANCE REQUEST</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>User:</b> {username} (<code>{user_id}</code>)\n"
+            f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
+            f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+            "<i>Please verify the payment and add balance.</i>"
+        )
         for admin_id in settings.get("admin_ids", []):
             try:
-                msg = (
-                    "💰 <b>NEW BALANCE REQUEST</b>\n"
-                    "━━━━━━━━━━━━━━━━━━\n"
-                    f"👤 <b>User:</b> {username} (<code>{user_id}</code>)\n"
-                    f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
-                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-                    "<i>Please verify the payment and add balance.</i>"
-                )
-                kb = [[InlineKeyboardButton("✅ Approve", callback_data=f"balapp_{user_id}_{amount}"), InlineKeyboardButton("❌ Reject", callback_data=f"balrej_{user_id}")]]
-                await context.bot.send_message(chat_id=admin_id, text=msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                kb = [[InlineKeyboardButton("✅ Approve", callback_data=f"balapp_{user_id}_{amount}_{order_id}"), InlineKeyboardButton("❌ Reject", callback_data=f"balrej_{user_id}_{order_id}")]]
+                sent_msg = await context.bot.send_message(chat_id=admin_id, text=msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                admin_messages[str(admin_id)] = sent_msg.message_id
             except:
                 pass
                 
+        save_order_messages(order_id, {"status": "pending", "messages": admin_messages, "text": msg, "is_photo": False})
+        
         await query.edit_message_caption(caption="✅ <b>Request Sent!</b>\n━━━━━━━━━━━━━━━━━━\nThe admin has been notified. Your balance will be added once the payment is verified.", parse_mode="HTML") if query.message.photo else await query.edit_message_text(text="✅ <b>Request Sent!</b>\n━━━━━━━━━━━━━━━━━━\nThe admin has been notified. Your balance will be added once the payment is verified.", parse_mode="HTML")
 
     elif data.startswith("balapp_"):
@@ -1889,6 +1911,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         user_id = parts[1]
         amount = float(parts[2])
+        order_id = parts[3] if len(parts) > 3 else "Unknown"
+        
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+            
+        order_data["status"] = "approved"
+        save_order_messages(order_id, order_data)
         
         balances = load_balances()
         balances[user_id] = balances.get(user_id, 0.0) + amount
@@ -1899,16 +1935,70 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
             
-        await query.edit_message_text(query.message.text + f"\n\n✅ <b>APPROVED</b>\nAdded ₹{amount:.2f} to {user_id}", parse_mode="HTML")
+        for admin_id, msg_id in order_data.get("messages", {}).items():
+            try:
+                if int(admin_id) == query.from_user.id:
+                    orig_text = order_data.get("text", "")
+                    update_text = (
+                        f"\n\n✅ <b>APPROVED</b>\n"
+                        f"👤 <b>Approved by:</b> {query.from_user.first_name}\n"
+                        f"💰 Added ₹{amount:.2f} to {user_id}"
+                    )
+                    await context.bot.edit_message_text(
+                        chat_id=int(admin_id),
+                        message_id=msg_id,
+                        text=orig_text + update_text,
+                        reply_markup=None,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await context.bot.delete_message(chat_id=int(admin_id), message_id=msg_id)
+            except Exception as e:
+                logger.error(f"Error updating/deleting admin message {admin_id}: {e}")
         
     elif data.startswith("balrej_"):
         if update.effective_user.id not in settings.get("admin_ids", []): return
-        user_id = data.split("_")[1]
+        parts = data.split("_")
+        user_id = parts[1]
+        order_id = parts[2] if len(parts) > 2 else "Unknown"
+        
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+            
+        order_data["status"] = "rejected"
+        save_order_messages(order_id, order_data)
+        
         try:
             await context.bot.send_message(chat_id=user_id, text="❌ <b>BALANCE REQUEST REJECTED</b>\n━━━━━━━━━━━━━━━━━━\nYour payment could not be verified. Please contact support.", parse_mode="HTML")
         except:
             pass
-        await query.edit_message_text(query.message.text + "\n\n❌ <b>REJECTED</b>", parse_mode="HTML")
+            
+        for admin_id, msg_id in order_data.get("messages", {}).items():
+            try:
+                if int(admin_id) == query.from_user.id:
+                    orig_text = order_data.get("text", "")
+                    update_text = (
+                        f"\n\n❌ <b>REJECTED</b>\n"
+                        f"👤 <b>Rejected by:</b> {query.from_user.first_name}"
+                    )
+                    await context.bot.edit_message_text(
+                        chat_id=int(admin_id),
+                        message_id=msg_id,
+                        text=orig_text + update_text,
+                        reply_markup=None,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await context.bot.delete_message(chat_id=int(admin_id), message_id=msg_id)
+            except Exception as e:
+                logger.error(f"Error updating/deleting admin message {admin_id}: {e}")
     elif data == "history":
         logs = load_user_history(query.from_user.id)
         if logs:
@@ -2354,6 +2444,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             duration_label = context.user_data.get("duration", "1d")
         
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=query.message.caption + status_text, reply_markup=None, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+
         # 1. GENERATE OR FETCH KEY
         auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
         
@@ -2369,6 +2472,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 delivered_key = None
         
         if delivered_key:
+            order_data["status"] = "approved"
+            save_order_messages(order_id, order_data)
+            
             resellers_check = load_resellers()
             target_str = str(target_user_id)
             if target_str in resellers_check:
@@ -2390,28 +2496,95 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
-                
-                # Update Admin Message
-                update_text = (
-                    f"✅ <b>APPROVED & KEY SENT</b>\n"
-                    f"🔑 <b>Generated:</b> <code>{delivered_key}</code>"
-                )
-                if query.message.photo:
-                    await query.edit_message_caption(caption=query.message.caption + f"\n\n{update_text}", parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=query.message.text + f"\n\n{update_text}", parse_mode="HTML")
             except Exception as e:
-                await query.answer(f"Error sending key: {e}", show_alert=True)
+                logger.error(f"Error sending key to user: {e}")
+                
+            for admin_id, msg_id in order_data.get("messages", {}).items():
+                try:
+                    if int(admin_id) == query.from_user.id:
+                        orig_text = order_data.get("text", "")
+                        update_text = (
+                            f"\n\n✅ <b>APPROVED & KEY SENT</b>\n"
+                            f"👤 <b>Approved by:</b> {query.from_user.first_name}\n"
+                            f"🔑 <b>Generated:</b> <code>{delivered_key}</code>"
+                        )
+                        if order_data.get("is_photo", False):
+                            await context.bot.edit_message_caption(
+                                chat_id=int(admin_id),
+                                message_id=msg_id,
+                                caption=orig_text + update_text,
+                                reply_markup=None,
+                                parse_mode="HTML"
+                            )
+                        else:
+                            await context.bot.edit_message_text(
+                                chat_id=int(admin_id),
+                                message_id=msg_id,
+                                text=orig_text + update_text,
+                                reply_markup=None,
+                                parse_mode="HTML"
+                            )
+                    else:
+                        await context.bot.delete_message(chat_id=int(admin_id), message_id=msg_id)
+                except Exception as e:
+                    logger.error(f"Error updating/deleting admin message {admin_id}: {e}")
         else:
             await query.answer(f"❌ ERROR! Could not generate or find a key for {product.upper()}. Out of stock?", show_alert=True)
 
     elif data.startswith("reject_"):
-        target_user_id = int(data.split("_")[1])
+        parts = data.split("_")
+        target_user_id = int(parts[1])
+        order_id = parts[2] if len(parts) > 2 else "Unknown"
+        
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=query.message.caption + status_text, reply_markup=None, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+            
+        order_data["status"] = "rejected"
+        save_order_messages(order_id, order_data)
+        
         try:
             await context.bot.send_message(chat_id=target_user_id, text="❌ <b>Payment Rejected!</b>\nYour payment could not be verified. Please contact support if you think this is a mistake.", parse_mode="HTML")
-            await query.edit_message_caption(caption=query.message.caption + "\n\n❌ <b>REJECTED</b>") if query.message.photo else await query.edit_message_text(text=query.message.text + "\n\n❌ <b>REJECTED</b>")
         except Exception as e:
-            await query.answer(f"Error notifying user: {e}", show_alert=True)
+            logger.error(f"Error notifying user: {e}")
+            
+        for admin_id, msg_id in order_data.get("messages", {}).items():
+            try:
+                if int(admin_id) == query.from_user.id:
+                    orig_text = order_data.get("text", "")
+                    update_text = (
+                        f"\n\n❌ <b>REJECTED</b>\n"
+                        f"👤 <b>Rejected by:</b> {query.from_user.first_name}"
+                    )
+                    if order_data.get("is_photo", False):
+                        await context.bot.edit_message_caption(
+                            chat_id=int(admin_id),
+                            message_id=msg_id,
+                            caption=orig_text + update_text,
+                            reply_markup=None,
+                            parse_mode="HTML"
+                        )
+                    else:
+                        await context.bot.edit_message_text(
+                            chat_id=int(admin_id),
+                            message_id=msg_id,
+                            text=orig_text + update_text,
+                            reply_markup=None,
+                            parse_mode="HTML"
+                        )
+                else:
+                    await context.bot.delete_message(chat_id=int(admin_id), message_id=msg_id)
+            except Exception as e:
+                logger.error(f"Error updating/deleting admin message {admin_id}: {e}")
     elif data.startswith("refresh_"):
         order_id = data.split("_")[1]
         amount = context.user_data.get("amount", "0")
