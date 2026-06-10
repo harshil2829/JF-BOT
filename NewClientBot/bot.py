@@ -139,60 +139,53 @@ def save_keys(keys):
     set_cached("keys", keys)
 
 def load_users():
-    doc = jf_col.find_one({"_id": "users"})
-    return doc["data"] if doc else []
+    return get_cached("users", [])
 
 def save_user(user_id):
     users = load_users()
     if user_id not in users:
         users.append(user_id)
-        jf_col.update_one({"_id": "users"}, {"$set": {"data": users}}, upsert=True)
+        set_cached("users", users)
 
 def load_verified_users():
-    doc = jf_col.find_one({"_id": "verified_users"})
-    return doc["data"] if doc else []
+    return get_cached("verified_users", [])
 
 def load_trial_history():
-    doc = jf_col.find_one({"_id": "trial_history"})
-    return doc["data"] if doc else []
+    return get_cached("trial_history", [])
 
 def save_trial_history(hist):
-    jf_col.update_one({"_id": "trial_history"}, {"$set": {"data": hist}}, upsert=True)
+    set_cached("trial_history", hist)
 
 def save_verified_user(user_id):
     verified = load_verified_users()
     if user_id not in verified:
         verified.append(user_id)
-        jf_col.update_one({"_id": "verified_users"}, {"$set": {"data": verified}}, upsert=True)
+        set_cached("verified_users", verified)
 
 def load_utr_log():
-    doc = jf_col.find_one({"_id": "utr_log"})
-    return doc["data"] if doc else []
+    return get_cached("utr_log", [])
 
 def save_utr(utr):
     log = load_utr_log()
     if utr not in log:
         log.append(utr)
-        jf_col.update_one({"_id": "utr_log"}, {"$set": {"data": log}}, upsert=True)
+        set_cached("utr_log", log)
 
 def debug_log(msg):
-    logs = jf_col.find_one({"_id": "debug_logs"})
-    data = logs["data"] if logs else []
-    data.append(msg)
-    jf_col.update_one({"_id": "debug_logs"}, {"$set": {"data": data[-100:]}}, upsert=True)
+    logs = get_cached("debug_logs", [])
+    logs.append(msg)
+    if len(logs) > 100:
+        logs = logs[-100:]
+    set_cached("debug_logs", logs)
 
 def load_resellers():
-    doc = jf_col.find_one({"_id": "resellers"})
-    return doc["data"] if doc else {}
+    return get_cached("resellers", {})
 
 def save_resellers(resellers):
-    jf_col.update_one({"_id": "resellers"}, {"$set": {"data": resellers}}, upsert=True)
+    set_cached("resellers", resellers)
 
 def load_reseller_logs():
-    doc = jf_col.find_one({"_id": "reseller_logs"})
-    if doc and isinstance(doc.get("data"), list):
-        return doc["data"]
-    return []
+    return get_cached("reseller_logs", [])
 
 def save_reseller_logs(username, user_id, product, key):
     logs = load_reseller_logs()
@@ -200,21 +193,19 @@ def save_reseller_logs(username, user_id, product, key):
     time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     logs.append(f"{time_str} - {username} ({user_id}) gen {product}: {key}")
     if len(logs) > 50: logs = logs[-50:]
-    jf_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
+    set_cached("reseller_logs", logs)
 
 def load_referrals():
-    doc = jf_col.find_one({"_id": "referrals"})
-    return doc["data"] if doc else {}
+    return get_cached("referrals", {})
 
 def save_referrals(refs):
-    jf_col.update_one({"_id": "referrals"}, {"$set": {"data": refs}}, upsert=True)
+    set_cached("referrals", refs)
 
 def load_reseller_perms():
-    doc = jf_col.find_one({"_id": "reseller_perms"})
-    return doc["data"] if doc else {}
+    return get_cached("reseller_perms", {})
 
 def save_reseller_perms(perms):
-    jf_col.update_one({"_id": "reseller_perms"}, {"$set": {"data": perms}}, upsert=True)
+    set_cached("reseller_perms", perms)
 
 
 def load_user_history(user_id):
