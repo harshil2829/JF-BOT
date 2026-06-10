@@ -1426,7 +1426,17 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /bc [Your Message]\nOR reply to an image/video/message with /bc [optional caption]")
         return
 
-    msg_to_send = " ".join(context.args) if context.args else None
+    # Extract raw text including newlines directly from the update message
+    msg_to_send = None
+    if update.message.text:
+        text_content = update.message.text
+        if text_content.startswith("/broadcast"):
+            msg_to_send = text_content[10:].strip()
+        elif text_content.startswith("/bc"):
+            msg_to_send = text_content[3:].strip()
+        if not msg_to_send:
+            msg_to_send = None
+
     users = load_users()
     
     count = 0
