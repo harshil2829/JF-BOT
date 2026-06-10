@@ -1929,38 +1929,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "⚠️ <b>INSUFFICIENT BALANCE</b>"
             full_payment_text = (
-                "<b>Status:</b> <code>Waiting for Payment...</code>\n"
-                "<i>Pay using the QR code below.</i>\n\n"
+                f"{title}\n"
                 "━━━━━━━━━━━━━━━━━━\n"
-                f"{title}\n\n"
                 f"🏺 <b>Product:</b> {product_name}\n"
                 f"⏳ <b>Duration:</b> {days}\n"
-                f"💵 <b>Pay Amount:</b> ${amount}\n"
+                f"💵 <b>Pay Amount:</b> ${amount:.2f} (৳{bdt_amount:.2f})\n"
                 f"💰 <b>Your Balance:</b> ${user_bal:.2f}\n"
-                f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
-                "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
+                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+                "Choose a payment method below to purchase:"
             )
             
             full_keyboard = [
-                [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"confirm_{order_id}")],
+                [InlineKeyboardButton("🇮🇳 Pay with Paytm/UPI (INR)", callback_data=f"pay_upi_{order_id}")],
+                [InlineKeyboardButton("🌍 Pay with Binance Pay (USDT)", callback_data=f"pay_binance_{order_id}")],
+                [InlineKeyboardButton("🇧🇩 Pay with bKash (BDT)", callback_data=f"pay_bkash_{order_id}")],
                 [InlineKeyboardButton("« Back to Store", callback_data="shop")]
             ]
             
-            if os.path.exists("qr.png"):
-                await context.bot.send_photo(
-                    chat_id=query.message.chat_id,
-                    photo=open("qr.png", "rb"),
-                    caption=full_payment_text,
-                    reply_markup=InlineKeyboardMarkup(full_keyboard),
-                    parse_mode="HTML"
-                )
-            else:
-                await context.bot.send_message(
-                    chat_id=query.message.chat_id,
-                    text=full_payment_text + "\n\n⚠️ <i>(QR Code image missing on server)</i>",
-                    reply_markup=InlineKeyboardMarkup(full_keyboard),
-                    parse_mode="HTML"
-                )
+            await query.message.delete()
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=full_payment_text,
+                reply_markup=InlineKeyboardMarkup(full_keyboard),
+                parse_mode="HTML"
+            )
 
     elif data.startswith("walletpay_"):
         try:
