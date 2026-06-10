@@ -127,17 +127,18 @@ def increment_total_keys():
     save_global_stats(stats)
 
 def load_balances():
-    return get_cached("balances", {})
+    doc = jf_col.find_one({"_id": "balances"})
+    return doc.get("data", {}) if doc else {}
 
 def save_balances(balances):
-    set_cached("balances", balances)
+    jf_col.update_one({"_id": "balances"}, {"$set": {"data": balances}}, upsert=True)
 
 def load_keys():
-    return get_cached("keys", {})
+    doc = jf_col.find_one({"_id": "keys"})
+    return doc.get("data", {}) if doc else {}
 
 def save_keys(keys):
-    set_cached("keys", keys)
-
+    jf_col.update_one({"_id": "keys"}, {"$set": {"data": keys}}, upsert=True)
 def load_users():
     return get_cached("users", [])
 
@@ -204,9 +205,11 @@ def save_referrals(refs):
 def load_reseller_perms():
     return get_cached("reseller_perms", {})
 
-def save_reseller_perms(perms):
-    set_cached("reseller_perms", perms)
+def load_wallet_purchases():
+    return get_cached("wallet_purchases", {})
 
+def save_wallet_purchases(data):
+    set_cached("wallet_purchases", data)
 
 def load_user_history(user_id):
     doc = jf_col.find_one({"_id": f"history_{user_id}"})
@@ -237,43 +240,11 @@ def log_reseller_action(username, user_id, product, key):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Default settings if file is missing
 DEFAULT_SETTINGS = {
     "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
     "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
 }
-
 
 
 
@@ -299,15 +270,6 @@ async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if trials[user_id]["strikes"] >= 3:
             trials[user_id]["banned"] = True
         save_trials(trials)
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1285,6 +1247,24 @@ async def unlock_refer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(0.05)
     await update.message.reply_text(f"✅ <b>Broadcast Complete!</b>\nSent to: {success}\nFailed: {failed}", parse_mode="HTML")
 
+async def lock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    settings["wallet_buy_locked"] = True
+    save_settings(settings)
+    await update.message.reply_text("🔒 <b>Wallet purchases have been locked for normal users!</b> Resellers can still buy.", parse_mode="HTML")
+
+async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    settings["wallet_buy_locked"] = False
+    save_settings(settings)
+    await update.message.reply_text("🔓 <b>Wallet purchases have been unlocked for all users!</b>", parse_mode="HTML")
+
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
@@ -1895,21 +1875,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             bdt_amount = amount * bdt_rate
         
         if user_bal >= amount:
-            title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
-            full_payment_text = (
-                f"{title}\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"🛍 <b>Product:</b> {product_name}\n"
-                f"⏳ <b>Duration:</b> {days}\n"
-                f"💵 <b>Amount:</b> ${amount:.2f} (৳{bdt_amount:.2f})\n"
-                f"💰 <b>Your Balance:</b> ${user_bal:.2f}\n\n"
-                "<i>Click '💰 Pay with Wallet' to buy instantly.</i>"
-            )
-            full_keyboard = [
-                [InlineKeyboardButton("💰 Pay with Wallet", callback_data=f"walletpay_{order_id}")],
-                [InlineKeyboardButton("💳 Pay Manually", callback_data=f"choosepay_{order_id}")],
-                [InlineKeyboardButton("« Back to Store", callback_data="shop")]
-            ]
+            settings = load_settings()
+            wallet_locked = settings.get("wallet_buy_locked", False)
+            if wallet_locked and not is_reseller:
+                full_payment_text = (
+                    "❌ <b>WALLET PURCHASE DISABLED</b>\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    "⚠️ <i>Wallet payments are temporarily disabled for normal users by Admin. Please select 'Pay Manually' below to buy.</i>\n\n"
+                    f"🛍 <b>Product:</b> {product_name}\n"
+                    f"⏳ <b>Duration:</b> {days}\n"
+                    f"💵 <b>Amount:</b> ${amount:.2f} (৳{bdt_amount:.2f})\n"
+                )
+                full_keyboard = [
+                    [InlineKeyboardButton("💳 Pay Manually", callback_data=f"choosepay_{order_id}")],
+                    [InlineKeyboardButton("« Back to Store", callback_data="shop")]
+                ]
+            else:
+                title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
+                full_payment_text = (
+                    f"{title}\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    f"🛍 <b>Product:</b> {product_name}\n"
+                    f"⏳ <b>Duration:</b> {days}\n"
+                    f"💵 <b>Amount:</b> ${amount:.2f} (৳{bdt_amount:.2f})\n"
+                    f"💰 <b>Your Balance:</b> ${user_bal:.2f}\n\n"
+                    "<i>Click '💰 Pay with Wallet' to buy instantly.</i>"
+                )
+                full_keyboard = [
+                    [InlineKeyboardButton("💰 Pay with Wallet", callback_data=f"walletpay_{order_id}")],
+                    [InlineKeyboardButton("💳 Pay Manually", callback_data=f"choosepay_{order_id}")],
+                    [InlineKeyboardButton("« Back to Store", callback_data="shop")]
+                ]
             await query.message.delete()
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
@@ -1948,6 +1944,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("walletpay_"):
         try:
             debug_log(f"Clicked walletpay: {data}")
+            user_id_str = str(query.from_user.id)
+            resellers = load_resellers()
+            is_reseller = user_id_str in resellers and time.time() < resellers[user_id_str]
+            settings = load_settings()
+            if settings.get("wallet_buy_locked", False) and not is_reseller:
+                await query.answer("🚫 Wallet purchase is currently disabled for normal users by the Admin.", show_alert=True)
+                return
             order_id = data.split("_")[1]
             if context.user_data.get(f"processed_{order_id}"):
                 await query.answer("Processing...", show_alert=False)
@@ -2204,13 +2207,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
             "👑 <code>/resellers</code> - List active resellers\n"
             "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
-            "📢 <code>/bc [message]</code> (or /broadcast) - Send message to all users\n"
+            "📢 <code>/broadcast [message]</code> - Send message to all users\n"
             "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
             "📦 <code>/stock</code> - Check stock levels\n"
-            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials\n"
-            "🔓 <code>/unlock_trial [optional: product]</code> - Unlock trials\n"
-            "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
-            "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions"
+            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials"
         )
         await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
@@ -2553,7 +2553,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔄 <code>/reset_trial [user_id]</code> - Reset trial cooldown\n"
             "🔑 <code>/rperms [reseller_id] [products]</code> - Set reseller permissions\n"
             "📦 <code>/add_product [key] [name]</code> - Add new product\n"
-            "🗑 <code>/delete_product [key]</code> - Delete a product"
+            "🗑 <code>/delete_product [key]</code> - Delete a product\n"
+            "🔒 <code>/lock_wallet</code> - Lock wallet buy for normal users\n"
+            "🔓 <code>/unlock_wallet</code> - Unlock wallet buy for normal users"
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
     else:
@@ -2604,6 +2606,8 @@ async def run_bot():
     application.add_handler(CommandHandler("add_product", add_product_cmd))
     application.add_handler(CommandHandler("delete_product", delete_product_cmd))
     application.add_handler(CommandHandler("del_product", delete_product_cmd))
+    application.add_handler(CommandHandler("lock_wallet", lock_wallet_cmd))
+    application.add_handler(CommandHandler("unlock_wallet", unlock_wallet_cmd))
     
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
