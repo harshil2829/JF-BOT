@@ -640,8 +640,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ <b>Error:</b> This Transaction ID (UTR) has already been used!")
             return
 
-        # 2. Check if Auto-Mode is ON
-        if IS_AUTO_MODE and utr and utr.isdigit() and len(utr) == 12:
+        # 2. Check if Auto-Mode is ON (Only for UPI)
+        pay_method = context.user_data.get("method", "upi")
+        if pay_method == "upi" and IS_AUTO_MODE and utr and utr.isdigit() and len(utr) == 12:
             status_msg = await update.message.reply_text("⏳ <b>Verifying your payment...</b> Please wait.", parse_mode="HTML")
             api_status = await verify_utr_api(order_id, amount)
             
@@ -1546,12 +1547,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]])
         if query.message.photo:
             await query.message.delete()
-            await context.bot.send_message(chat_id=query.message.chat_id, text="💰 <b>ADD BALANCE</b>\n━━━━━━━━━━━━━━━━━━\nPlease type the amount you want to add to your wallet in USD ($).\n(For bKash, 1 USD = 120 BDT)", reply_markup=keyboard, parse_mode="HTML")
+            await context.bot.send_message(chat_id=query.message.chat_id, text="💰 <b>ADD BALANCE</b>\n━━━━━━━━━━━━━━━━━━\nPlease type the amount you want to add to your wallet in USD ($).\n(For bKash, 1 USD = 120 BDT)\n(For UPI, 1 USD = 80 INR)", reply_markup=keyboard, parse_mode="HTML")
         else:
             await query.edit_message_text(
                 "💰 <b>ADD BALANCE</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
-                "Please type the amount you want to add to your wallet in USD ($).\n(For bKash, 1 USD = 120 BDT)",
+                "Please type the amount you want to add to your wallet in USD ($).\n(For bKash, 1 USD = 120 BDT)\n(For UPI, 1 USD = 80 INR)",
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
@@ -1615,42 +1616,107 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount_bdt = amount_usd * 120
         
         if method == "binance":
-            pay_details = f"<b>Binance ID:</b> <code>781257349</code>\n<b>Amount:</b> ${amount_usd:.2f}"
+            import urllib.parse
+            settings = load_settings()
+            binance_id = settings.get("binance_id", "781257349")
+            
+            pay_details = f"<b>Binance ID:</b> <code>{binance_id}</code>\n<b>Amount:</b> ${amount_usd:.2f}"
             msg = (
-                f"💳 <b>PAYMENT DETAILS ({method.upper()})</b>\n"
+                f"💳 <b>PAYMENT DETAILS (BINANCE)</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"{pay_details}\n\n"
-                f"<i>After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
+                f"<i>Scan the QR code below or pay to the Binance ID. After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
             )
+            encoded_data = urllib.parse.quote_plus(binance_id)
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_data}"
+            
             context.user_data["state"] = "awaiting_receipt"
-            await query.edit_message_text(msg, parse_mode="HTML")
+            context.user_data["order_id"] = order_id
+            context.user_data["method"] = "binance"
+            
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+                
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=qr_url,
+                caption=msg,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Store", callback_data="shop")]]),
+                parse_mode="HTML"
+            )
         elif method == "bkash":
-            pay_details = f"<b>bKash Personal:</b> <code>01874640097</code>\n<b>Amount:</b> ৳{amount_bdt:.2f}"
+            import urllib.parse
+            settings = load_settings()
+            bkash_number = settings.get("bkash_number", "01874640097")
+            
+            pay_details = f"<b>bKash Personal:</b> <code>{bkash_number}</code>\n<b>Amount:</b> ৳{amount_bdt:.2f}"
             msg = (
-                f"💳 <b>PAYMENT DETAILS ({method.upper()})</b>\n"
+                f"💳 <b>PAYMENT DETAILS (BKASH)</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"{pay_details}\n\n"
-                f"<i>After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
+                f"<i>Scan the QR code below or send money to the bKash Personal number. After paying exactly the amount shown above, please send your Transaction ID or Screenshot here to confirm.</i>"
             )
+            encoded_data = urllib.parse.quote_plus(bkash_number)
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_data}"
+            
             context.user_data["state"] = "awaiting_receipt"
-            await query.edit_message_text(msg, parse_mode="HTML")
+            context.user_data["order_id"] = order_id
+            context.user_data["method"] = "bkash"
+            
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+                
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=qr_url,
+                caption=msg,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Store", callback_data="shop")]]),
+                parse_mode="HTML"
+            )
         elif method == "upi":
-            payment_url = await create_upigateway_order(amount_usd, order_id, query.from_user.first_name)
-            pay_details = f"<b>UPI ID:</b> <code>paytm.s1xzhpw@pty</code>\n"
-            pay_details += f"<b>Amount:</b> ${amount_usd:.2f}\n"
+            import urllib.parse
+            settings = load_settings()
+            inr_rate = float(settings.get("inr_rate", 80.0))
+            upi_id = settings.get("upi_id", "paytm.s1xzhpw@pty")
+            amount_inr = amount_usd * inr_rate
+            
+            payment_url = await create_upigateway_order(amount_inr, order_id, query.from_user.first_name)
+            pay_details = f"<b>UPI ID:</b> <code>{upi_id}</code>\n"
+            pay_details += f"<b>Amount:</b> ₹{amount_inr:.2f} (${amount_usd:.2f})\n"
             if payment_url:
                 pay_details += f"🔗 <b>Payment Link:</b> <a href=\"{payment_url}\">Click here to Pay</a>\n"
                 
+            upi_uri = f"upi://pay?pa={upi_id}&pn=Store&am={amount_inr:.2f}&cu=INR"
+            encoded_upi = urllib.parse.quote_plus(upi_uri)
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_upi}"
+            
             msg = (
                 f"💳 <b>UPI PAYMENT (INDIA)</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"{pay_details}\n"
                 f"⏳ <b>Time Limit:</b> 5 Minutes\n\n"
-                f"<i>Please make your payment within 5 minutes. After paying, send your 12-digit UTR/Transaction ID here to confirm.</i>"
+                f"<i>Scan the QR code to pay exactly <b>₹{amount_inr:.2f}</b>, then send your 12-digit UTR/Transaction ID or Screenshot here to confirm.</i>"
             )
             context.user_data["state"] = "awaiting_receipt"
             context.user_data["order_id"] = order_id
-            await query.edit_message_text(msg, parse_mode="HTML")
+            context.user_data["method"] = "upi"
+            
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+                
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=qr_url,
+                caption=msg,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Store", callback_data="shop")]]),
+                parse_mode="HTML"
+            )
             
             async def run_upi_timer():
                 await asyncio.sleep(300)
