@@ -52,16 +52,13 @@ def set_cached(key, data):
     jf_col.update_one({"_id": key}, {"$set": {"data": data}}, upsert=True)
 
 def load_web_settings():
-    doc = jf_col.find_one({"_id": "web_settings"})
-    return doc.get("data", {}) if doc else {}
+    return get_cached("web_settings", {})
 
 def load_web_staff():
-    doc = jf_col.find_one({"_id": "web_staff"})
-    return doc.get("data", []) if doc else []
+    return get_cached("web_staff", [])
 
 def load_web_products():
-    doc = jf_col.find_one({"_id": "web_products"})
-    return doc.get("data", []) if doc else []
+    return get_cached("web_products", [])
 
 def log_activity(user_id, action):
     doc = jf_col.find_one({"_id": "bot_activity_logs"})
