@@ -892,11 +892,6 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha"),
         InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
         InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
-        InlineKeyboardButton("BOOYAH MOD", callback_data="product_boyyah"),
-        InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
-        InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro"),
-        InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
-        InlineKeyboardButton("GREED CHEAT", callback_data="product_greed"),
         InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
         InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
         InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
@@ -909,8 +904,7 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("DAEMON PHONK", callback_data="product_daemon"),
         InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
         InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
-        InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
-        InlineKeyboardButton("OS VICTORY 8BP", callback_data="product_osvictory")
+        InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra")
     ]
     
     if user_id:
@@ -1655,8 +1649,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
             [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
-            [InlineKeyboardButton("BOOYAH MOD", callback_data="claim_trial_boyyah"), InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo")],
-            [InlineKeyboardButton("GREED CHEAT", callback_data="claim_trial_greed"), InlineKeyboardButton("STREAMER X (.SH)", callback_data="claim_trial_streamerx")],
             [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
         ]
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
