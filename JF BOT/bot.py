@@ -2170,8 +2170,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         await query.message.delete()
         
-        if user_bal >= float_amount:
-            settings = load_settings()
+        is_admin = query.from_user.id in settings.get("admin_ids", [])
+        if is_admin or user_bal >= float_amount:
             wallet_locked = settings.get("wallet_buy_locked", False)
             locked_prods = settings.get("wallet_locked_products", [])
             locked_prods_lower = [p.lower() for p in locked_prods]
@@ -2186,7 +2186,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             wp = load_wallet_purchases()
             already_bought_today = (wp.get(user_id_str, "") == today_str)
             
-            if (wallet_locked or product_locked or already_bought_today) and not is_reseller:
+            if not is_admin and (wallet_locked or product_locked or already_bought_today) and not is_reseller:
                 title = "❌ <b>WALLET PURCHASE DISABLED</b>"
                 reason_msg = "⚠️ <i>You have already purchased 1 key today using Wallet balance. Please pay using the QR code below for additional purchases.</i>" if already_bought_today else "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>"
                 full_payment_text = (
@@ -2221,7 +2221,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         parse_mode="HTML"
                     )
             else:
-                title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
+                if is_admin:
+                    title = "👑 <b>ADMIN CHECKOUT</b>"
+                elif is_reseller:
+                    title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>"
+                else:
+                    title = "✅ <b>SUFFICIENT BALANCE</b>"
                 full_payment_text = (
                     "<b>Status:</b> <code>Ready to Checkout</code>\n"
                     "<i>Pay using your Wallet Balance.</i>\n\n"
@@ -2300,7 +2305,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             today_str = datetime.now().strftime("%Y-%m-%d")
             wp = load_wallet_purchases()
             already_bought_today = (wp.get(user_id_str, "") == today_str)
-            if (wallet_locked or product_locked or already_bought_today) and not is_reseller:
+            is_admin = query.from_user.id in settings.get("admin_ids", [])
+            if not is_admin and (wallet_locked or product_locked or already_bought_today) and not is_reseller:
                 await query.answer("🚫 You have already purchased 1 key today using Wallet balance.", show_alert=True)
                 return
             order_id = data.split("_")[1]
@@ -2321,10 +2327,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_bal = balances.get(user_id_str, 0.0)
         
             debug_log(f"user_bal: {user_bal}, amount: {amount}")
-            if user_bal >= amount:
+            if is_admin or user_bal >= amount:
                 debug_log("Sufficient balance")
-                balances[user_id_str] -= amount
-                save_balances(balances)
+                if not is_admin:
+                    balances[user_id_str] -= amount
+                    save_balances(balances)
             
                 auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
                 delivered_key = None
@@ -2373,12 +2380,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         except:
                             pass
                 
+                    remaining_bal = user_bal if is_admin else balances[user_id_str]
                     success_msg = (
                         "✅ <b>PURCHASE SUCCESSFUL!</b>\n"
                         "━━━━━━━━━━━━━━━━━━\n"
                         f"🏺 <b>Product:</b> {product.upper()}\n"
                         f"⏳ <b>Duration:</b> {duration_label.upper()}\n"
-                        f"💰 <b>Remaining Balance:</b> ₹{balances[user_id_str]:.2f}\n"
+                        f"💰 <b>Remaining Balance:</b> ₹{remaining_bal:.2f}\n"
                         "━━━━━━━━━━━━━━━━━━\n"
                         f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                         "<i>Thank you for shopping with us!</i>\n\n"
@@ -2388,8 +2396,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await query.edit_message_text(text=success_msg, parse_mode="HTML")
                     debug_log("Edited success msg")
                 else:
-                    balances[user_id_str] += amount
-                    save_balances(balances)
+                    if not is_admin:
+                        balances[user_id_str] += amount
+                        save_balances(balances)
                     
                     wl = load_waitlists()
                     if product not in wl: wl[product] = []
