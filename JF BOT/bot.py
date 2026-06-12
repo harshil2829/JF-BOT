@@ -894,7 +894,6 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
         InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
         InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
-        InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
         InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
         InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
         InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
