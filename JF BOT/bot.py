@@ -900,7 +900,9 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("DAEMON PHONK", callback_data="product_daemon"),
         InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
         InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
-        InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra")
+        InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
+        InlineKeyboardButton("XTFFH4X STREAMER", callback_data="product_xtffh4x_streamer"),
+        InlineKeyboardButton("HOT STREAMER", callback_data="product_hot_streamer")
     ]
     
     if user_id:
@@ -1645,7 +1647,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
             [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
-            [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+            [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("XTFFH4X STREAMER", callback_data="claim_trial_xtffh4x")],
+            [InlineKeyboardButton("HOT STREAMER", callback_data="claim_trial_hotstreamer"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
         ]
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
