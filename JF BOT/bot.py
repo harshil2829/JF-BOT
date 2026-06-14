@@ -1764,19 +1764,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
             [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
             [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx")],
-            [InlineKeyboardButton("STREAMER-X PRO", callback_data="bulk_prod_streamerpro"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
-            [InlineKeyboardButton("GREED", callback_data="bulk_prod_greed"), InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="bulk_prod_primehook")],
             [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
-            [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
-            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj")],
+            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
             [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
-            [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
-            [InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro"), InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon")],
-            [InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
-            [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure")],
-            [InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
-            [InlineKeyboardButton("OS VICTORY 8BP", callback_data="bulk_prod_osvictory")],
+            [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
+            [InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
+            [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure"), InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
+            [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer"), InlineKeyboardButton("HOT STREAMER", callback_data="bulk_prod_hot_streamer")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         context.user_data["state"] = "awaiting_bulk_product"
@@ -2960,6 +2954,20 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(help_text, parse_mode="HTML")
 
 async def run_bot():
+    try:
+        keys_db = load_keys()
+        purged = False
+        if isinstance(keys_db, dict):
+            for k in list(keys_db.keys()):
+                if "kiwmodz" in k.lower():
+                    del keys_db[k]
+                    purged = True
+            if purged:
+                save_keys(keys_db)
+                print("Purged deleted product keys (kiwmodz) from DB.")
+    except Exception as e:
+        print(f"Error purging keys: {e}")
+
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
