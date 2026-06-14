@@ -335,12 +335,16 @@ async def check_force_sub(user_id, context):
 
 async def verify_utr_api(client_txn_id, amount):
     """Checks the order status on UPIGateway.com."""
+    settings = load_settings()
+    dep_mode = settings.get("deposit_mode", "auto")
+    if dep_mode != "auto":
+        return "manual"
     if not IS_AUTO_MODE:
         return "manual"
         
     api_url = "https://merchant.upigateway.com/api/check_order_status"
     params = {
-        "key": UPI_GATEWAY_TOKEN,
+        "key": settings.get("merchant_id", UPI_GATEWAY_TOKEN),
         "client_txn_id": client_txn_id
     }
     
@@ -358,9 +362,10 @@ async def verify_utr_api(client_txn_id, amount):
 
 async def create_upigateway_order(amount, order_id, user_name):
     """Creates a dynamic order/QR on UPIGateway."""
+    settings = load_settings()
     api_url = "https://merchant.upigateway.com/api/create_order"
     payload = {
-        "key": UPI_GATEWAY_TOKEN,
+        "key": settings.get("merchant_id", UPI_GATEWAY_TOKEN),
         "client_txn_id": order_id,
         "amount": amount,
         "p_info": "Mod Menu Subscription",
@@ -388,6 +393,10 @@ async def generate_key_from_api(product, duration_label):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    settings = load_settings()
+    if settings.get("bot_status", "on") == "off" and user_id not in settings.get("admin_ids", []):
+        await update.message.reply_text("⚠️ <b>Bot Status: Offline</b>\nThe bot is currently offline. Please try again later.", parse_mode="HTML")
+        return
     if is_banned(user_id):
         await update.message.reply_text("🚫 You are banned from this bot for abusing the trial system.")
         return
@@ -499,6 +508,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     """Handles text and photo messages."""
     settings = load_settings()
+    if settings.get("bot_status", "on") == "off" and not is_admin:
+        await update.message.reply_text("⚠️ <b>Bot Status: Offline</b>\nThe bot is currently offline. Please try again later.", parse_mode="HTML")
+        return
     
     # Check if this is a forwarded message (to get channel ID)
     chat_id = None
@@ -525,6 +537,75 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     
     
+    if state == "awaiting_manual_upi":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        new_val = update.message.text.strip()
+        settings = load_settings()
+        settings["upi_id"] = new_val
+        save_settings(settings)
+        context.user_data["state"] = None
+        kb = [[InlineKeyboardButton("« Back to Deposit Menu", callback_data="admin_deposit_menu")]]
+        await update.message.reply_text(f"✅ Manual UPI ID updated to: <code>{new_val}</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
+    if state == "awaiting_auto_upi":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        new_val = update.message.text.strip()
+        settings = load_settings()
+        settings["auto_upi"] = new_val
+        save_settings(settings)
+        context.user_data["state"] = None
+        kb = [[InlineKeyboardButton("« Back to Deposit Menu", callback_data="admin_deposit_menu")]]
+        await update.message.reply_text(f"✅ Auto Deposit UPI ID updated to: <code>{new_val}</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
+    if state == "awaiting_merchant_id":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        new_val = update.message.text.strip()
+        settings = load_settings()
+        settings["merchant_id"] = new_val
+        save_settings(settings)
+        context.user_data["state"] = None
+        kb = [[InlineKeyboardButton("« Back to Deposit Menu", callback_data="admin_deposit_menu")]]
+        await update.message.reply_text(f"✅ Merchant ID/Token updated to: <code>{new_val}</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
+    if state == "awaiting_binance_id":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        new_val = update.message.text.strip()
+        settings = load_settings()
+        settings["binance_id"] = new_val
+        save_settings(settings)
+        context.user_data["state"] = None
+        kb = [[InlineKeyboardButton("« Back to Deposit Menu", callback_data="admin_deposit_menu")]]
+        await update.message.reply_text(f"✅ Binance ID updated to: <code>{new_val}</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
+    if state == "awaiting_binance_address":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        new_val = update.message.text.strip()
+        settings = load_settings()
+        settings["binance_address"] = new_val
+        save_settings(settings)
+        context.user_data["state"] = None
+        kb = [[InlineKeyboardButton("« Back to Deposit Menu", callback_data="admin_deposit_menu")]]
+        await update.message.reply_text(f"✅ Binance Address updated to: <code>{new_val}</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
+    if state == "awaiting_min_refer":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        try:
+            new_val = int(update.message.text.strip())
+            settings = load_settings()
+            settings["min_refer"] = new_val
+            save_settings(settings)
+            context.user_data["state"] = None
+            kb = [[InlineKeyboardButton("« Back to Admin Dashboard", callback_data="admin_panel_cb")]]
+            await update.message.reply_text(f"✅ Minimum Refer limit updated to: <code>{new_val}</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        except ValueError:
+            await update.message.reply_text("❌ Invalid number. Please enter a valid integer (e.g. 5):")
+        return
+
     if state == "awaiting_balance_amount":
         try:
             import string
@@ -657,15 +738,25 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         if getattr(update.message, "text", None) == "👑 Admin Panel":
             if update.effective_user.id in settings["admin_ids"]:
+                admin_name = update.effective_user.first_name
+                bot_status = settings.get("bot_status", "on")
+                status_emoji = "🟢 On" if bot_status == "on" else "🔴 Off"
+                
+                admin_text = (
+                    f"👋 <b>Welcome {admin_name}</b> 🧬 🎉\n"
+                    "________________\n\n"
+                    f"🤖 <b>Bot Status :</b> {status_emoji}"
+                )
+                
                 keyboard = [
-                    [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
-                    [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
-                    [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-                    [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-                    [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
-                    [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
+                    [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
+                    [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
+                    [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
+                    [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+                    [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
+                    [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
                 ]
-                await update.message.reply_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+                await update.message.reply_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
             return
 
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -775,28 +866,23 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ You are not authorized to use admin commands.")
         return
 
+    admin_name = update.effective_user.first_name
+    bot_status = settings.get("bot_status", "on")
+    status_emoji = "🟢 On" if bot_status == "on" else "🔴 Off"
+    
     admin_text = (
-        "👑 <b>Admin Panel</b>\n\n"
-        "Commands:\n"
-        "/set_welcome [text] - Update the store menu text\n"
-        "/add_admin [id] - Authorize another admin\n"
-        "/add_balance [id] [amt] - Add balance to user\n"
-        "/add_reseller [id] [days] - Add a reseller\n"
-        "/remove_reseller [id] - Remove a reseller\n"
-        "/resellers - List all active resellers\n"
-        "/rlogs [id] - View reseller activity\n"
-        "/bc [msg] - Send a message to all users\n"
-        "/add_key [prod] [duration] [key] - Add a single license key\n"
-        "/stock - Check remaining keys stock"
+        f"👋 <b>Welcome {admin_name}</b> 🧬 🎉\n"
+        "________________\n\n"
+        f"🤖 <b>Bot Status :</b> {status_emoji}"
     )
     
     keyboard = [
-        [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
-        [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
-        [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-        [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-        [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
-        [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
+        [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
+        [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
+        [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
+        [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+        [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
+        [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
     ]
     await update.message.reply_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
@@ -1303,7 +1389,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     data = query.data
     settings = load_settings()
-    
+    if settings.get("bot_status", "on") == "off" and update.effective_user.id not in settings.get("admin_ids", []):
+        await query.answer("⚠️ Bot is currently offline.", show_alert=True)
+        return
 
     if is_banned(update.effective_user.id):
         await query.answer("🚫 You are banned.", show_alert=True)
@@ -2135,7 +2223,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 await query.answer(f"Error sending key: {e}", show_alert=True)
         else:
-            await query.answer(f"❌ ERROR! Could not generate or find a key for {product.upper()}. Out of stock?", show_alert=True)
+            success_msg = (
+                "✅ <b>PAYMENT VERIFIED!</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"🏺 <b>Product:</b> {product.upper()}\n"
+                f"⏳ <b>Duration:</b> {duration_label.upper()}\n"
+                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ <b>We are currently out of stock for this key!</b>\n"
+                "The admin will send your key manually very soon. Thank you for your patience!\n\n"
+                "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
+            )
+            try:
+                await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
+                
+                # Update Admin Message
+                update_text = (
+                    f"✅ <b>APPROVED (OUT OF STOCK)</b>\n"
+                    f"⚠️ <i>Please deliver the key manually to user: <code>{target_user_id}</code></i>"
+                )
+                if query.message.photo:
+                    await query.edit_message_caption(caption=query.message.caption + f"\n\n{update_text}", parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=query.message.text + f"\n\n{update_text}", parse_mode="HTML")
+            except Exception as e:
+                await query.answer(f"Error sending notification: {e}", show_alert=True)
 
     elif data.startswith("reject_"):
         target_user_id = int(data.split("_")[1])
@@ -2185,15 +2297,194 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Payment status: PENDING ⌛\nPlease wait 1-2 minutes after paying.", show_alert=True)
     elif data == "admin_panel_cb":
         if update.effective_user.id not in settings["admin_ids"]: return
+        admin_name = update.effective_user.first_name
+        bot_status = settings.get("bot_status", "on")
+        status_emoji = "🟢 On" if bot_status == "on" else "🔴 Off"
+        
+        admin_text = (
+            f"👋 <b>Welcome {admin_name}</b> 🧬 🎉\n"
+            "________________\n\n"
+            f"🤖 <b>Bot Status :</b> {status_emoji}"
+        )
+        
         keyboard = [
-            [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
-            [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
-            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
-            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-            [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
-            [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
+            [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
+            [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
+            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
+            [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+            [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
+            [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
         ]
-        await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        await query.edit_message_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
+    elif data == "toggle_bot_status":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        bot_status = settings.get("bot_status", "on")
+        new_status = "off" if bot_status == "on" else "on"
+        settings["bot_status"] = new_status
+        save_settings(settings)
+        
+        status_emoji = "🟢 On" if new_status == "on" else "🔴 Off"
+        admin_name = update.effective_user.first_name
+        admin_text = (
+            f"👋 <b>Welcome {admin_name}</b> 🧬 🎉\n"
+            "________________\n\n"
+            f"🤖 <b>Bot Status :</b> {status_emoji}"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
+            [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
+            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
+            [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+            [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
+            [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
+        ]
+        await query.edit_message_text(admin_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        await query.answer(f"Bot Status set to {new_status.upper()}")
+
+    elif data == "admin_broadcast":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        await query.edit_message_text("To broadcast a message to all users, type:\n<code>/broadcast [message]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+    elif data == "admin_deposit_menu":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        dep_mode = settings.get("deposit_mode", "auto")
+        if dep_mode == "auto":
+            dep_text = "🟢 Auto"
+        elif dep_mode == "manual":
+            dep_text = "🔴 Manual"
+        else:
+            dep_text = "🔘 Off"
+            
+        admin_name = update.effective_user.first_name
+        menu_text = (
+            f"👋 <b>Welcome {admin_name}</b> 🧬 🎉\n"
+            "________________\n\n"
+            "<b>DEPOSIT MOOD</b>"
+        )
+        
+        kb = [
+            [InlineKeyboardButton(f"🤖 Bot: {dep_text}", callback_data="toggle_deposit_mode")],
+            [InlineKeyboardButton("Manual Upi", callback_data="admin_config_manual_upi")],
+            [InlineKeyboardButton("Auto Deposit Upi", callback_data="admin_config_auto_upi"), InlineKeyboardButton("Merchant Id", callback_data="admin_config_merchant_id")],
+            [InlineKeyboardButton("Binance Id", callback_data="admin_config_binance_id"), InlineKeyboardButton("Binance Address", callback_data="admin_config_binance_address")],
+            [InlineKeyboardButton("« Back To Menu", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text(menu_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+    elif data == "toggle_deposit_mode":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        current = settings.get("deposit_mode", "auto")
+        if current == "auto":
+            next_mode = "manual"
+        elif current == "manual":
+            next_mode = "off"
+        else:
+            next_mode = "auto"
+        settings["deposit_mode"] = next_mode
+        save_settings(settings)
+        
+        if next_mode == "auto":
+            dep_text = "🟢 Auto"
+        elif next_mode == "manual":
+            dep_text = "🔴 Manual"
+        else:
+            dep_text = "🔘 Off"
+            
+        admin_name = update.effective_user.first_name
+        menu_text = (
+            f"👋 <b>Welcome {admin_name}</b> 🧬 🎉\n"
+            "________________\n\n"
+            "<b>DEPOSIT MOOD</b>"
+        )
+        
+        kb = [
+            [InlineKeyboardButton(f"🤖 Bot: {dep_text}", callback_data="toggle_deposit_mode")],
+            [InlineKeyboardButton("Manual Upi", callback_data="admin_config_manual_upi")],
+            [InlineKeyboardButton("Auto Deposit Upi", callback_data="admin_config_auto_upi"), InlineKeyboardButton("Merchant Id", callback_data="admin_config_merchant_id")],
+            [InlineKeyboardButton("Binance Id", callback_data="admin_config_binance_id"), InlineKeyboardButton("Binance Address", callback_data="admin_config_binance_address")],
+            [InlineKeyboardButton("« Back To Menu", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text(menu_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        await query.answer(f"Deposit Mode set to {next_mode.upper()}")
+
+    elif data == "admin_config_manual_upi":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_manual_upi"
+        current = settings.get("upi_id", "paytm.s1xzhpw@pty")
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_deposit_menu")]]
+        await query.edit_message_text(f"Please enter the new Manual UPI ID (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        
+    elif data == "admin_config_auto_upi":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_auto_upi"
+        current = settings.get("auto_upi", "None")
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_deposit_menu")]]
+        await query.edit_message_text(f"Please enter the new Auto Deposit UPI ID (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        
+    elif data == "admin_config_merchant_id":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_merchant_id"
+        current = settings.get("merchant_id", UPI_GATEWAY_TOKEN)
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_deposit_menu")]]
+        await query.edit_message_text(f"Please enter the new Merchant ID/Token (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        
+    elif data == "admin_config_binance_id":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_binance_id"
+        current = settings.get("binance_id", "781257349")
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_deposit_menu")]]
+        await query.edit_message_text(f"Please enter the new Binance ID (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        
+    elif data == "admin_config_binance_address":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_binance_address"
+        current = settings.get("binance_address", "None")
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_deposit_menu")]]
+        await query.edit_message_text(f"Please enter the new Binance Address (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+    elif data == "admin_set_min_refer":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_min_refer"
+        current = settings.get("min_refer", 5)
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        await query.edit_message_text(f"Please enter the new Minimum Refer limit (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+
+    elif data == "admin_shop_setup_placeholder":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        products = load_products()
+        prod_text = "\n".join([f"• {p['name']} (key: <code>{p['key']}</code>)" for p in products])
+        text = (
+            "📊 <b>Shop Setup</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"Current products:\n{prod_text}\n\n"
+            "To add a product, use command:\n"
+            "<code>/add_product [key] [name]</code>\n"
+            "To delete a product, use command:\n"
+            "<code>/del_product [key]</code>"
+        )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        
+    elif data == "admin_channel_setup_placeholder":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        channels = settings.get("force_channels", [])
+        ch_text = ""
+        for i, ch in enumerate(channels):
+            ch_text += f"• Channel {i+1}: <code>{ch['id']}</code> - <a href=\"{ch['link']}\">Link</a>\n"
+        if not ch_text:
+            ch_text = "No channels configured."
+        text = (
+            "🔎 <b>Channel Setup</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"Current channels:\n{ch_text}\n\n"
+            "To add a channel, forward a message from that channel to the bot to get the channel ID, then type:\n"
+            "<code>/add_channel [channel_id] [invite_link]</code>\n"
+            "To reset all channels, type:\n"
+            "<code>/reset_channels</code>"
+        )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_help_commands":
         if update.effective_user.id not in settings["admin_ids"]: return
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
