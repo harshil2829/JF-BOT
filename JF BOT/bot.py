@@ -3183,7 +3183,57 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
 
+def ensure_default_products():
+    try:
+        products = load_web_products()
+        default_names = [
+            ("hxn", "HXN CHEAT", "Both"),
+            ("lk", "LK TEAM", "Both"),
+            ("hex", "HEX BLADE", "Both"),
+            ("alpha", "ALPHA-X-STORE", "Both"),
+            ("prime", "PRIME X CHEAT", "Both"),
+            ("harshil", "HARSHIL MODS", "Both"),
+            ("trinity", "TRINITY X ROOT", "Both"),
+            ("fluorite", "FLUORITE ANDROID", "Both"),
+            ("svj", "SVJ CHEATS", "Both"),
+            ("brmods", "BR MODS", "Both"),
+            ("beyond", "BEYOND CHEATS", "Both"),
+            ("rogerio", "ROGERIO MODS", "Both"),
+            ("hwak", "HAWK CHEATS", "Both"),
+            ("rapid", "RAPID CORE", "Both"),
+            ("daemon", "DAEMON PHONK", "Both"),
+            ("hxnstreamer", "HXN STREAMER (.SH)", "Both"),
+            ("bs", "BS SECURE LOADER", "Both"),
+            ("hydra", "HYDRA ENGINE 8BP", "Both"),
+            ("xtffh4x_streamer", "XTFFH4X STREAMER", "Both"),
+            ("streamerx", "STREAMER X", "Both"),
+            ("boyyah", "BOOYAH PANEL", "Both"),
+            ("eliteteam", "ELITE TEAM", "Both"),
+            ("ngo", "NGO TRAN", "Both"),
+            ("greed", "GREED PANEL", "Both"),
+            ("lkpro", "LK TEAM PRO", "Both"),
+            ("kiwmodz", "KIWMODZ EXE", "Both"),
+            ("xyz", "XYZ SUPREME", "Both")
+        ]
+        changed = False
+        existing_names = {wp.get("name", "").lower() for wp in products}
+        for name_id, display_name, section in default_names:
+            if name_id not in existing_names:
+                products.append({
+                    "name": name_id,
+                    "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
+                    "status": "Active",
+                    "section": section
+                })
+                changed = True
+        if changed:
+            save_web_products(products)
+            print("Successfully populated missing default products into database.")
+    except Exception as e:
+        print(f"Error populating default products: {e}")
+
 async def run_bot():
+    ensure_default_products()
     try:
         keys_db = load_keys()
         purged = False
