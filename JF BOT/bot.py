@@ -60,6 +60,9 @@ def load_web_staff():
 def load_web_products():
     return get_cached("web_products", [])
 
+def save_web_products(products):
+    set_cached("web_products", products)
+
 def log_activity(user_id, action):
     doc = jf_col.find_one({"_id": "bot_activity_logs"})
     logs = doc.get("data", []) if doc else []
@@ -683,6 +686,36 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Please enter a valid positive number.")
                 return
 
+    if state == "awaiting_new_product_name":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = update.message.text.strip().lower() if update.message.text else ""
+        if not prod_name:
+            await update.message.reply_text("❌ Invalid name. Please send a valid product name:")
+            return
+        
+        web_products = load_web_products()
+        exists = any(wp.get("name", "").lower() == prod_name for wp in web_products)
+        if exists:
+            await update.message.reply_text(f"⚠️ <b>{prod_name.upper()}</b> already exists in the product list.\n\nEnter another name or cancel:")
+            return
+        
+        context.user_data["new_product_name"] = prod_name
+        context.user_data["state"] = None
+        
+        keyboard = [
+            [InlineKeyboardButton("Trial Only", callback_data="admin_add_product_sec_trial")],
+            [InlineKeyboardButton("Selling Only", callback_data="admin_add_product_sec_selling")],
+            [InlineKeyboardButton("Both", callback_data="admin_add_product_sec_both")],
+            [InlineKeyboardButton("« Cancel", callback_data="admin_prod_mgmt")]
+        ]
+        await update.message.reply_text(
+            f"🛒 <b>Product:</b> {prod_name.upper()}\n\n"
+            "Select which section this product belongs to:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+        return
+
     if state == "awaiting_bulk_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
         product = context.user_data.get("bulk_product")
@@ -793,6 +826,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
                     [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+                    [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
                     [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
                     [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
                 ]
@@ -882,35 +916,45 @@ def get_main_menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_shop_keyboard(user_id=None):
-    all_buttons = [
-        InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"),
-        InlineKeyboardButton("LK TEAM", callback_data="product_lk"),
-        InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
-        InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha"),
-        InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
-        InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
-        InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
-        InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
-        InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
-        InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
-        InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
-        InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
-        InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk"),
-        InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
-        InlineKeyboardButton("DAEMON PHONK", callback_data="product_daemon"),
-        InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
-        InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
-        InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
-        InlineKeyboardButton("XTFFH4X STREAMER", callback_data="product_xtffh4x_streamer"),
-        InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
-        InlineKeyboardButton("BOOYAH PANEL", callback_data="product_boyyah"),
-        InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
-        InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
-        InlineKeyboardButton("GREED PANEL", callback_data="product_greed"),
-        InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro"),
-        InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
-        InlineKeyboardButton("XYZ SUPREME", callback_data="product_xyz")
-    ]
+    web_products = load_web_products()
+    if not web_products:
+        all_buttons = [
+            InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"),
+            InlineKeyboardButton("LK TEAM", callback_data="product_lk"),
+            InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
+            InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha"),
+            InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
+            InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
+            InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
+            InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
+            InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
+            InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
+            InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
+            InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
+            InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk"),
+            InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
+            InlineKeyboardButton("DAEMON PHONK", callback_data="product_daemon"),
+            InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
+            InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
+            InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
+            InlineKeyboardButton("XTFFH4X STREAMER", callback_data="product_xtffh4x_streamer"),
+            InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
+            InlineKeyboardButton("BOOYAH PANEL", callback_data="product_boyyah"),
+            InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
+            InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
+            InlineKeyboardButton("GREED PANEL", callback_data="product_greed"),
+            InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro"),
+            InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
+            InlineKeyboardButton("XYZ SUPREME", callback_data="product_xyz")
+        ]
+    else:
+        all_buttons = []
+        for wp in web_products:
+            section = wp.get("section", "Both")
+            if section in ["Selling Only", "Both", "selling", "both"]:
+                name = wp.get("name", "").upper().replace("_", " ")
+                callback = f"product_{wp.get('name', '').lower()}"
+                all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
     
     if user_id:
         resellers = load_resellers()
@@ -1651,16 +1695,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
-        keyboard = [
-            [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
-            [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
-            [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("XTFFH4X STREAMER", callback_data="claim_trial_xtffh4x")],
-            [InlineKeyboardButton("HOT STREAMER", callback_data="claim_trial_hotstreamer"), InlineKeyboardButton("STREAMER X", callback_data="claim_trial_streamerx")],
-            [InlineKeyboardButton("BOOYAH PANEL", callback_data="claim_trial_boyyah"), InlineKeyboardButton("ELITE TEAM", callback_data="claim_trial_eliteteam")],
-            [InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo"), InlineKeyboardButton("GREED PANEL", callback_data="claim_trial_greed")],
-            [InlineKeyboardButton("LK TEAM PRO", callback_data="claim_trial_lkpro"), InlineKeyboardButton("KIWMODZ EXE", callback_data="claim_trial_kiwmodz")],
-            [InlineKeyboardButton("XYZ SUPREME", callback_data="claim_trial_xyz"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
-        ]
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [
+                [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
+                [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
+                [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("XTFFH4X STREAMER", callback_data="claim_trial_xtffh4x")],
+                [InlineKeyboardButton("HOT STREAMER", callback_data="claim_trial_hotstreamer"), InlineKeyboardButton("STREAMER X", callback_data="claim_trial_streamerx")],
+                [InlineKeyboardButton("BOOYAH PANEL", callback_data="claim_trial_boyyah"), InlineKeyboardButton("ELITE TEAM", callback_data="claim_trial_eliteteam")],
+                [InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo"), InlineKeyboardButton("GREED PANEL", callback_data="claim_trial_greed")],
+                [InlineKeyboardButton("LK TEAM PRO", callback_data="claim_trial_lkpro"), InlineKeyboardButton("KIWMODZ EXE", callback_data="claim_trial_kiwmodz")],
+                [InlineKeyboardButton("XYZ SUPREME", callback_data="claim_trial_xyz"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+            ]
+            await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            return
+
+        all_buttons = []
+        for wp in web_products:
+            section = wp.get("section", "Both")
+            if section in ["Trial Only", "Both", "trial", "both"]:
+                name = wp.get("name", "").upper().replace("_", " ") + " TRIAL"
+                callback = f"claim_trial_{wp.get('name', '').lower()}"
+                all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
+                
+        keyboard = []
+        for i in range(0, len(all_buttons), 2):
+            keyboard.append(all_buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")])
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
@@ -1771,27 +1832,43 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "admin_add_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
-        keyboard = [
-            [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
-            [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
-            [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-            [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
-            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
-            [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
-            [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
-            [InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
-            [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure"), InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
-            [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer")],
-            [InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx"), InlineKeyboardButton("BOOYAH PANEL", callback_data="bulk_prod_boyyah")],
-            [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
-            [InlineKeyboardButton("GREED PANEL", callback_data="bulk_prod_greed"), InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro")],
-            [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("XYZ SUPREME", callback_data="bulk_prod_xyz")],
-            [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
-        ]
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [
+                [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
+                [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
+                [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
+                [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
+                [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
+                [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
+                [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
+                [InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
+                [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure"), InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
+                [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer")],
+                [InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx"), InlineKeyboardButton("BOOYAH PANEL", callback_data="bulk_prod_boyyah")],
+                [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
+                [InlineKeyboardButton("GREED PANEL", callback_data="bulk_prod_greed"), InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro")],
+                [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("XYZ SUPREME", callback_data="bulk_prod_xyz")],
+                [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
+            ]
+            context.user_data["state"] = "awaiting_bulk_product"
+            await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            return
+
+        all_buttons = []
+        for wp in web_products:
+            name = wp.get("name", "").upper().replace("_", " ")
+            callback = f"bulk_prod_{wp.get('name', '').lower()}"
+            all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
+            
+        keyboard = []
+        for i in range(0, len(all_buttons), 2):
+            keyboard.append(all_buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")])
         context.user_data["state"] = "awaiting_bulk_product"
         await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
-        
+
     if data.startswith("bulk_prod_"):
         if update.effective_user.id not in settings["admin_ids"]: return
         product = data.split("_")[2]
@@ -2634,10 +2711,148 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
             [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
             [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
             [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_prod_mgmt":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        keyboard = [
+            [InlineKeyboardButton("➕ Add Product", callback_data="admin_add_product_start")],
+            [InlineKeyboardButton("➖ Remove Product", callback_data="admin_remove_product_start")],
+            [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text("📦 <b>Product Management Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_add_product_start":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_new_product_name"
+        keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text("✏️ <b>Enter the name of the new product:</b>\n(e.g., kiwmodz exe)", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_add_product_sec_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        section_type = data.split("_")[4]
+        prod_name = context.user_data.get("new_product_name")
+        if not prod_name:
+            await query.answer("❌ Session expired. Please try again.", show_alert=True)
+            return
+        sec_map = {
+            "trial": "Trial Only",
+            "selling": "Selling Only",
+            "both": "Both"
+        }
+        section_val = sec_map.get(section_type, "Both")
+        web_products = load_web_products()
+        new_prod = {
+            "name": prod_name,
+            "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
+            "status": "Active",
+            "section": section_val
+        }
+        web_products.append(new_prod)
+        save_web_products(web_products)
+        
+        keys = load_keys()
+        for dur in ["1d", "7d", "15d", "30d", "trial"]:
+            dict_key = f"{prod_name}_{dur}"
+            if dict_key not in keys:
+                keys[dict_key] = []
+        save_keys(keys)
+        
+        keyboard = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(
+            f"✅ <b>PRODUCT ADDED SUCCESSFULLY!</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Name:</b> {prod_name.upper()}\n"
+            f"📁 <b>Section:</b> {section_val}\n"
+            f"💰 <b>Default Prices:</b> 1d: 50, 7d: 200, 15d: 400, 30d: 600\n"
+            f"📈 <b>Stock Initialized:</b> empty keys added to database\n"
+            "━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data == "admin_remove_product_start":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No active products found to remove.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        buttons = []
+        for wp in web_products:
+            name = wp.get("name", "").upper()
+            cb = f"admin_rmsel_{wp.get('name', '').lower()}"
+            buttons.append(InlineKeyboardButton(name, callback_data=cb))
+        keyboard = []
+        for i in range(0, len(buttons), 2):
+            keyboard.append(buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")])
+        await query.edit_message_text("🗑️ <b>Select a product to remove:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_rmsel_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = data.split("_")[2]
+        keyboard = [
+            [InlineKeyboardButton("Remove from Trial Only", callback_data=f"admin_rmact_{prod_name}_trial")],
+            [InlineKeyboardButton("Remove from Selling Only", callback_data=f"admin_rmact_{prod_name}_selling")],
+            [InlineKeyboardButton("Remove Completely (With Stock)", callback_data=f"admin_rmact_{prod_name}_both")],
+            [InlineKeyboardButton("« Back", callback_data="admin_remove_product_start")]
+        ]
+        await query.edit_message_text(
+            f"❓ <b>How do you want to remove {prod_name.upper()}?</b>\n\n"
+            "• <b>Trial Only:</b> Remove from Trial menu but keep in Selling menu.\n"
+            "• <b>Selling Only:</b> Remove from Shop/Selling menu but keep in Trial menu.\n"
+            "• <b>Remove Completely:</b> Fully delete the product and clear all stock keys from database.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data.startswith("admin_rmact_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        parts = data.split("_")
+        prod_name = parts[2]
+        action = parts[3]
+        web_products = load_web_products()
+        updated_products = []
+        removed_completely = False
+        section_changed_to = None
+        for wp in web_products:
+            if wp.get("name", "").lower() == prod_name.lower():
+                current_sec = wp.get("section", "Both")
+                if action == "trial":
+                    if current_sec == "Both":
+                        wp["section"] = "Selling Only"
+                        section_changed_to = "Selling Only"
+                        updated_products.append(wp)
+                    elif current_sec == "Trial Only":
+                        removed_completely = True
+                    else:
+                        updated_products.append(wp)
+                elif action == "selling":
+                    if current_sec == "Both":
+                        wp["section"] = "Trial Only"
+                        section_changed_to = "Trial Only"
+                        updated_products.append(wp)
+                    elif current_sec == "Selling Only":
+                        removed_completely = True
+                    else:
+                        updated_products.append(wp)
+                elif action == "both":
+                    removed_completely = True
+            else:
+                updated_products.append(wp)
+        save_web_products(updated_products)
+        if removed_completely:
+            keys = load_keys()
+            to_delete = [k for k in keys if k.startswith(f"{prod_name}_") or k == prod_name]
+            for k in to_delete:
+                keys.pop(k, None)
+            save_keys(keys)
+            msg_text = f"✅ <b>{prod_name.upper()}</b> has been completely removed along with all its stock keys."
+        else:
+            if section_changed_to:
+                msg_text = f"✅ <b>{prod_name.upper()}</b> section has been updated to <b>{section_changed_to}</b>."
+            else:
+                msg_text = f"✅ No changes were needed for <b>{prod_name.upper()}</b>."
+        keyboard = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(msg_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     elif data == "admin_help_commands":
         if update.effective_user.id not in settings["admin_ids"]: return
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
