@@ -902,7 +902,14 @@ def get_shop_keyboard(user_id=None):
         InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
         InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
         InlineKeyboardButton("XTFFH4X STREAMER", callback_data="product_xtffh4x_streamer"),
-        InlineKeyboardButton("HOT STREAMER", callback_data="product_hot_streamer")
+        InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
+        InlineKeyboardButton("BOOYAH PANEL", callback_data="product_boyyah"),
+        InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
+        InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
+        InlineKeyboardButton("GREED PANEL", callback_data="product_greed"),
+        InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro"),
+        InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
+        InlineKeyboardButton("XYZ SUPREME", callback_data="product_xyz")
     ]
     
     if user_id:
@@ -1648,7 +1655,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
             [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
             [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("XTFFH4X STREAMER", callback_data="claim_trial_xtffh4x")],
-            [InlineKeyboardButton("HOT STREAMER", callback_data="claim_trial_hotstreamer"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+            [InlineKeyboardButton("HOT STREAMER", callback_data="claim_trial_hotstreamer"), InlineKeyboardButton("STREAMER X", callback_data="claim_trial_streamerx")],
+            [InlineKeyboardButton("BOOYAH PANEL", callback_data="claim_trial_boyyah"), InlineKeyboardButton("ELITE TEAM", callback_data="claim_trial_eliteteam")],
+            [InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo"), InlineKeyboardButton("GREED PANEL", callback_data="claim_trial_greed")],
+            [InlineKeyboardButton("LK TEAM PRO", callback_data="claim_trial_lkpro"), InlineKeyboardButton("KIWMODZ EXE", callback_data="claim_trial_kiwmodz")],
+            [InlineKeyboardButton("XYZ SUPREME", callback_data="claim_trial_xyz"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
         ]
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
@@ -1770,7 +1781,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
             [InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
             [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure"), InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
-            [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer"), InlineKeyboardButton("HOT STREAMER", callback_data="bulk_prod_hot_streamer")],
+            [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer")],
+            [InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx"), InlineKeyboardButton("BOOYAH PANEL", callback_data="bulk_prod_boyyah")],
+            [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
+            [InlineKeyboardButton("GREED PANEL", callback_data="bulk_prod_greed"), InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro")],
+            [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("XYZ SUPREME", callback_data="bulk_prod_xyz")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         context.user_data["state"] = "awaiting_bulk_product"
@@ -2959,12 +2974,12 @@ async def run_bot():
         purged = False
         if isinstance(keys_db, dict):
             for k in list(keys_db.keys()):
-                if "kiwmodz" in k.lower():
+                if "hotstreamer" in k.lower() or "hot_streamer" in k.lower():
                     del keys_db[k]
                     purged = True
             if purged:
                 save_keys(keys_db)
-                print("Purged deleted product keys (kiwmodz) from DB.")
+                print("Purged deleted product keys (hot streamer) from DB.")
     except Exception as e:
         print(f"Error purging keys: {e}")
 
