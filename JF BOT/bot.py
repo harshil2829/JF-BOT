@@ -2790,7 +2790,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🗑️ <b>Select a product to remove:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     elif data.startswith("admin_rmsel_"):
         if update.effective_user.id not in settings["admin_ids"]: return
-        prod_name = data.split("_")[2]
+        prod_name = "_".join(data.split("_")[2:])
         keyboard = [
             [InlineKeyboardButton("Remove from Trial Only", callback_data=f"admin_rmact_{prod_name}_trial")],
             [InlineKeyboardButton("Remove from Selling Only", callback_data=f"admin_rmact_{prod_name}_selling")],
@@ -2808,8 +2808,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("admin_rmact_"):
         if update.effective_user.id not in settings["admin_ids"]: return
         parts = data.split("_")
-        prod_name = parts[2]
-        action = parts[3]
+        prod_name = "_".join(parts[2:-1])
+        action = parts[-1]
         web_products = load_web_products()
         updated_products = []
         removed_completely = False
