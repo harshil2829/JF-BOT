@@ -952,7 +952,7 @@ def get_shop_keyboard(user_id=None):
         for wp in web_products:
             section = wp.get("section", "Both")
             if section in ["Selling Only", "Both", "selling", "both"]:
-                name = wp.get("name", "").upper().replace("_", " ")
+                name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
                 callback = f"product_{wp.get('name', '').lower()}"
                 all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
     
@@ -1714,7 +1714,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for wp in web_products:
             section = wp.get("section", "Both")
             if section in ["Trial Only", "Both", "trial", "both"]:
-                name = wp.get("name", "").upper().replace("_", " ") + " TRIAL"
+                name = (wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")) + " TRIAL"
                 callback = f"claim_trial_{wp.get('name', '').lower()}"
                 all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
                 
@@ -1857,7 +1857,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         all_buttons = []
         for wp in web_products:
-            name = wp.get("name", "").upper().replace("_", " ")
+            name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
             callback = f"bulk_prod_{wp.get('name', '').lower()}"
             all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
             
@@ -2745,6 +2745,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         web_products = load_web_products()
         new_prod = {
             "name": prod_name,
+            "display_name": prod_name.upper(),
             "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
             "status": "Active",
             "section": section_val
@@ -2779,7 +2780,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         buttons = []
         for wp in web_products:
-            name = wp.get("name", "").upper()
+            name = wp.get("display_name") or wp.get("name", "").upper()
             cb = f"admin_rmsel_{wp.get('name', '').lower()}"
             buttons.append(InlineKeyboardButton(name, callback_data=cb))
         keyboard = []
@@ -3186,44 +3187,50 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def ensure_default_products():
     try:
         products = load_web_products()
-        default_names = [
-            ("hxn", "HXN CHEAT", "Both"),
-            ("lk", "LK TEAM", "Both"),
-            ("hex", "HEX BLADE", "Both"),
-            ("alpha", "ALPHA-X-STORE", "Both"),
-            ("prime", "PRIME X CHEAT", "Both"),
-            ("harshil", "HARSHIL MODS", "Both"),
-            ("trinity", "TRINITY X ROOT", "Both"),
-            ("fluorite", "FLUORITE ANDROID", "Both"),
-            ("svj", "SVJ CHEATS", "Both"),
-            ("brmods", "BR MODS", "Both"),
-            ("beyond", "BEYOND CHEATS", "Both"),
-            ("rogerio", "ROGERIO MODS", "Both"),
-            ("hwak", "HAWK CHEATS", "Both"),
-            ("rapid", "RAPID CORE", "Both"),
-            ("daemon", "DAEMON PHONK", "Both"),
-            ("hxnstreamer", "HXN STREAMER (.SH)", "Both"),
-            ("bs", "BS SECURE LOADER", "Both"),
-            ("hydra", "HYDRA ENGINE 8BP", "Both"),
-            ("xtffh4x_streamer", "XTFFH4X STREAMER", "Both"),
-            ("streamerx", "STREAMER X", "Both"),
-            ("boyyah", "BOOYAH PANEL", "Both"),
-            ("eliteteam", "ELITE TEAM", "Both"),
-            ("ngo", "NGO TRAN", "Both"),
-            ("greed", "GREED PANEL", "Both"),
-            ("lkpro", "LK TEAM PRO", "Both"),
-            ("kiwmodz", "KIWMODZ EXE", "Both"),
-            ("xyz", "XYZ SUPREME", "Both")
-        ]
+        display_map = {
+            "hxn": "HXN CHEAT",
+            "lk": "LK TEAM",
+            "hex": "HEX BLADE",
+            "alpha": "ALPHA-X-STORE",
+            "prime": "PRIME X CHEAT",
+            "harshil": "HARSHIL MODS",
+            "trinity": "TRINITY X ROOT",
+            "fluorite": "FLUORITE ANDROID",
+            "svj": "SVJ CHEATS",
+            "brmods": "BR MODS",
+            "beyond": "BEYOND CHEATS",
+            "rogerio": "ROGERIO MODS",
+            "hwak": "HAWK CHEATS",
+            "rapid": "RAPID CORE",
+            "daemon": "DAEMON PHONK",
+            "hxnstreamer": "HXN STREAMER (.SH)",
+            "bs": "BS SECURE LOADER",
+            "hydra": "HYDRA ENGINE 8BP",
+            "xtffh4x_streamer": "XTFFH4X STREAMER",
+            "streamerx": "STREAMER X",
+            "boyyah": "BOOYAH PANEL",
+            "eliteteam": "ELITE TEAM",
+            "ngo": "NGO TRAN",
+            "greed": "GREED PANEL",
+            "lkpro": "LK TEAM PRO",
+            "kiwmodz": "KIWMODZ EXE",
+            "xyz": "XYZ SUPREME"
+        }
         changed = False
+        for wp in products:
+            pname = wp.get("name", "").lower()
+            if pname in display_map and not wp.get("display_name"):
+                wp["display_name"] = display_map[pname]
+                changed = True
         existing_names = {wp.get("name", "").lower() for wp in products}
-        for name_id, display_name, section in default_names:
+        for name_id, display_name in display_map.items():
             if name_id not in existing_names:
                 products.append({
                     "name": name_id,
+                    "display_name": display_name,
                     "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
                     "status": "Active",
-                    "section": section
+                    "section": "Both"
                 })
                 changed = True
         if changed:
