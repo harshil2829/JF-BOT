@@ -8,67 +8,81 @@ client = MongoClient(MONGO_URI, connectTimeoutMS=5000, socketTimeoutMS=5000, max
 db = client['TelegramBotDB']
 tele_col = db['tele_data']
 
+import time
+_CACHE = {}
+_CACHE_TTL = 30 # 30 seconds cache TTL to dramatically reduce MongoDB latency
+
+def get_cached(key, default):
+    now = time.time()
+    if key in _CACHE:
+        data, ts = _CACHE[key]
+        if now - ts < _CACHE_TTL:
+            return data
+    doc = tele_col.find_one({"_id": key})
+    if doc and "data" in doc:
+        data = doc["data"]
+    else:
+        data = default
+    _CACHE[key] = (data, now)
+    return data
+
+def set_cached(key, data):
+    _CACHE[key] = (data, time.time())
+    tele_col.update_one({"_id": key}, {"$set": {"data": data}}, upsert=True)
+
 def load_settings():
-    doc = tele_col.find_one({"_id": "settings"})
-    return doc["data"] if doc else {"admin_ids": [12345678]}
+    return get_cached("settings", {"admin_ids": [12345678]})
 
 def save_settings(settings):
-    tele_col.update_one({"_id": "settings"}, {"$set": {"data": settings}}, upsert=True)
+    set_cached("settings", settings)
 
 def load_users():
-    doc = tele_col.find_one({"_id": "users"})
-    return doc["data"] if doc else []
+    return get_cached("users", [])
 
 def save_user(user_id):
     users = load_users()
     if user_id not in users:
         users.append(user_id)
-        tele_col.update_one({"_id": "users"}, {"$set": {"data": users}}, upsert=True)
+        set_cached("users", users)
 
 def load_verified_users():
-    doc = tele_col.find_one({"_id": "verified_users"})
-    return doc["data"] if doc else []
+    return get_cached("verified_users", [])
 
 def save_verified_user(user_id):
     verified = load_verified_users()
     if user_id not in verified:
         verified.append(user_id)
-        tele_col.update_one({"_id": "verified_users"}, {"$set": {"data": verified}}, upsert=True)
+        set_cached("verified_users", verified)
 
 def load_keys():
-    doc = tele_col.find_one({"_id": "keys"})
-    return doc["data"] if doc else {}
+    return get_cached("keys", {})
 
 def save_keys(keys):
-    tele_col.update_one({"_id": "keys"}, {"$set": {"data": keys}}, upsert=True)
+    set_cached("keys", keys)
 
 def load_utr_log():
-    doc = tele_col.find_one({"_id": "utr_log"})
-    return doc["data"] if doc else []
+    return get_cached("utr_log", [])
 
 def save_utr(utr):
     log = load_utr_log()
     if utr not in log:
         log.append(utr)
-        tele_col.update_one({"_id": "utr_log"}, {"$set": {"data": log}}, upsert=True)
+        set_cached("utr_log", log)
 
 def load_balances():
-    doc = tele_col.find_one({"_id": "balances"})
-    return doc["data"] if doc else {}
+    return get_cached("balances", {})
 
 def save_balances(balances):
-    tele_col.update_one({"_id": "balances"}, {"$set": {"data": balances}}, upsert=True)
+    set_cached("balances", balances)
 
 def load_resellers():
-    doc = tele_col.find_one({"_id": "resellers"})
-    return doc["data"] if doc else {}
+    return get_cached("resellers", {})
 
 def save_resellers(resellers):
-    tele_col.update_one({"_id": "resellers"}, {"$set": {"data": resellers}}, upsert=True)
+    set_cached("resellers", resellers)
 
 def load_reseller_logs():
-    doc = tele_col.find_one({"_id": "reseller_logs"})
-    return doc["data"] if doc else []
+    return get_cached("reseller_logs", [])
 
 def save_reseller_logs(user_id, product, key):
     logs = load_reseller_logs()
@@ -76,7 +90,27 @@ def save_reseller_logs(user_id, product, key):
     time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     logs.append(f"{time_str} - User {user_id} generated {product} key: {key}")
     if len(logs) > 50: logs = logs[-50:]
-    tele_col.update_one({"_id": "reseller_logs"}, {"$set": {"data": logs}}, upsert=True)
+    set_cached("reseller_logs", logs)
+
+def load_web_products():
+    col = db['jf_data']
+    doc = col.find_one({"_id": "web_products"})
+    return doc.get("data", []) if doc else []
+
+def save_web_products(products):
+    col = db['jf_data']
+    col.update_one({"_id": "web_products"}, {"$set": {"data": products}}, upsert=True)
+
+def check_use_api(product):
+    try:
+        products = load_web_products()
+        for p in products:
+            if p.get("name", "").lower() == product.lower():
+                if p.get("use_api") is not None:
+                    return p.get("use_api")
+    except Exception as e:
+        logger.error(f"Error checking check_use_api: {e}")
+    return product.lower() in ["hxn", "prime", "harshil", "hxnmodule"]
 
 import asyncio
 import json
@@ -228,6 +262,35 @@ def save_utr(utr):
         with open(UTR_LOG_FILE, "w") as f:
             json.dump(log, f, indent=4)
 
+ADMIN_MESSAGES_FILE = "admin_messages.json"
+
+def load_admin_order_messages():
+    if not os.path.exists(ADMIN_MESSAGES_FILE):
+        return {}
+    with open(ADMIN_MESSAGES_FILE, "r") as f:
+        try:
+            return json.load(f)
+        except:
+            return {}
+
+def save_admin_order_messages(order_id, messages, status="pending", processed_by=None, is_photo=False, original_text=None):
+    data = load_admin_order_messages()
+    data[order_id] = {
+        "messages": messages,
+        "status": status,
+        "processed_by": processed_by,
+        "is_photo": is_photo,
+        "original_text": original_text
+    }
+    with open(ADMIN_MESSAGES_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+def check_order_status(order_id):
+    data = load_admin_order_messages()
+    if order_id in data:
+        return data[order_id].get("status", "pending"), data[order_id].get("processed_by")
+    return "pending", None
+
 
 async def get_unjoined_channels(user_id, context):
     settings = load_settings()
@@ -319,7 +382,7 @@ async def create_upigateway_order(amount, order_id, user_name):
             
     return None
 
-async def generate_key_from_api(product, duration_label):
+async def generate_key_from_api(product, duration_label, product_id=None):
     """Calls the Alwaysdata API to generate a real key."""
     api_url = "https://harshilexe.alwaysdata.net/api/generate.php"
     api_secret = "hxn_secret_12345"
@@ -334,16 +397,10 @@ async def generate_key_from_api(product, duration_label):
     }
     site_duration = duration_map.get(duration_label, "1 Day")
     
-    # Map products to IDs (You can add more later)
-    product_map = {
-        "hxn": 1,
-        "primex": 2 
-    }
-    product_id = product_map.get(product.lower(), 1)
-    
+    # All API queries use product_id = 1 as per user's instructions
     params = {
         "secret": api_secret,
-        "product_id": product_id,
+        "product_id": 1,
         "duration": site_duration,
         "amount": 1,
         "max_devices": 1
@@ -435,6 +492,36 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     
     
+    if state == "awaiting_new_product_name":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = update.message.text.strip().lower() if update.message.text else ""
+        if not prod_name:
+            await update.message.reply_text("❌ Invalid name. Please send a valid product name:")
+            return
+        
+        web_products = load_web_products()
+        exists = any(wp.get("name", "").lower() == prod_name for wp in web_products)
+        if exists:
+            await update.message.reply_text(f"⚠️ <b>{prod_name.upper()}</b> already exists in the product list.\n\nEnter another name or cancel:")
+            return
+        
+        context.user_data["new_product_name"] = prod_name
+        context.user_data["state"] = None
+        
+        keyboard = [
+            [InlineKeyboardButton("Trial Only", callback_data="admin_add_product_sec_trial")],
+            [InlineKeyboardButton("Selling Only", callback_data="admin_add_product_sec_selling")],
+            [InlineKeyboardButton("Both", callback_data="admin_add_product_sec_both")],
+            [InlineKeyboardButton("« Cancel", callback_data="admin_prod_mgmt")]
+        ]
+        await update.message.reply_text(
+            f"🛒 <b>Product:</b> {prod_name.upper()}\n\n"
+            "Select which section this product belongs to:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+        return
+
     if state == "awaiting_bulk_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
         product = context.user_data.get("bulk_product")
@@ -456,7 +543,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if state == "awaiting_receipt":
         user = update.effective_user
-        order_id = context.user_data.get("order_id", "Unknown")
+        order_id = context.user_data.get("order_id")
+        if not order_id or order_id == "Unknown":
+            order_id = "OID" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         product = context.user_data.get("product", "Unknown")
         amount = context.user_data.get("amount", "0")
         utr = update.message.text
@@ -509,18 +598,24 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user.id}_{product}_{order_id}"),
-                InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")
+                InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}_{order_id}")
             ]
         ])
         
+        is_photo = bool(update.message.photo)
+        admin_messages = []
         for admin_id in settings["admin_ids"]:
             try:
-                if update.message.photo:
-                    await context.bot.send_photo(chat_id=admin_id, photo=update.message.photo[-1].file_id, caption=admin_msg, reply_markup=keyboard, parse_mode="HTML")
+                if is_photo:
+                    msg = await context.bot.send_photo(chat_id=admin_id, photo=update.message.photo[-1].file_id, caption=admin_msg, reply_markup=keyboard, parse_mode="HTML")
                 else:
-                    await context.bot.send_message(chat_id=admin_id, text=admin_msg, reply_markup=keyboard, parse_mode="HTML")
+                    msg = await context.bot.send_message(chat_id=admin_id, text=admin_msg, reply_markup=keyboard, parse_mode="HTML")
+                admin_messages.append({"chat_id": admin_id, "message_id": msg.message_id})
             except Exception as e:
                 logger.error(f"Could not notify admin {admin_id}: {e}")
+        
+        if order_id and order_id != "Unknown":
+            save_admin_order_messages(order_id, admin_messages, status="pending", is_photo=is_photo, original_text=admin_msg)
         
         await update.message.reply_text("✅ <b>Receipt Received!</b>\nOur admin is verifying your payment. You will receive your key soon.", parse_mode="HTML")
         context.user_data["state"] = None # Reset state
@@ -532,6 +627,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
                     [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+                    [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
                     [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
                 ]
                 await update.message.reply_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -620,52 +716,37 @@ def get_main_menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_shop_keyboard():
-    keyboard = [
-        [
-            InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"),
-            InlineKeyboardButton("LK TEAM", callback_data="product_lk")
-        ],
-        [
-            InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
-            InlineKeyboardButton("ALPHA-X-STORE", callback_data="product_alpha")
-        ],
-        [
-            InlineKeyboardButton("PRIME X", callback_data="product_prime"),
-            InlineKeyboardButton("HARSHIL", callback_data="product_harshil")
-        ],
-        [
-            InlineKeyboardButton("BOOYAH MOD", callback_data="product_boyyah"),
-            InlineKeyboardButton("STREAMER X", callback_data="product_streamerx")
-        ],
-        [
-            InlineKeyboardButton("STREAMER-X PRO", callback_data="product_streamerpro"),
-            InlineKeyboardButton("NGO TRAN", callback_data="product_ngo")
-        ],
-        [
-            InlineKeyboardButton("GREED CHEAT", callback_data="product_greed"),
-            InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="product_primehook")
-        ],
-        [
-            InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
-            InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite")
-        ],
-        [
-            InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
-            InlineKeyboardButton("BR MODS", callback_data="product_brmods")
-        ],
-        [
-            InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
-            InlineKeyboardButton("VIPER TEAM", callback_data="product_viper")
-        ],
-        [
-            InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
-            InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio")
-        ],
-        [
-            InlineKeyboardButton("HWAK CHEATS", callback_data="product_hwak")
-        ],
-        [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
-    ]
+    web_products = load_web_products()
+    if not web_products:
+        keyboard = [
+            [InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"), InlineKeyboardButton("LK TEAM", callback_data="product_lk")],
+            [InlineKeyboardButton("HEX BLADE", callback_data="product_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="product_alpha")],
+            [InlineKeyboardButton("PRIME X", callback_data="product_prime"), InlineKeyboardButton("HARSHIL", callback_data="product_harshil")],
+            [InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"), InlineKeyboardButton("BOOYAH PANEL", callback_data="product_boyyah")],
+            [InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"), InlineKeyboardButton("NGO TRAN", callback_data="product_ngo")],
+            [InlineKeyboardButton("GREED PANEL", callback_data="product_greed"), InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro")],
+            [InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"), InlineKeyboardButton("XYZ SUPREME", callback_data="product_xyz")],
+            [InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"), InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite")],
+            [InlineKeyboardButton("BR MODS", callback_data="product_brmods")],
+            [InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"), InlineKeyboardButton("VIPER TEAM", callback_data="product_viper")],
+            [InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"), InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio")],
+            [InlineKeyboardButton("HWAK CHEATS", callback_data="product_hwak")],
+            [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    all_buttons = []
+    for wp in web_products:
+        section = wp.get("section", "Both")
+        if section in ["Selling Only", "Both", "selling", "both"]:
+            name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+            callback = f"product_{wp.get('name', '').lower()}"
+            all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
+            
+    keyboard = []
+    for i in range(0, len(all_buttons), 2):
+        keyboard.append(all_buttons[i:i+2])
+    keyboard.append([InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")])
     return InlineKeyboardMarkup(keyboard)
 
 # --- ADMIN COMMANDS ---
@@ -855,12 +936,11 @@ async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product = context.args[0].lower()
     duration_label = context.args[1].lower()
     
-    auto_products = ["hxn", "prime", "harshil"]
     delivered_key = None
     
     status_msg = await update.message.reply_text("🔄 Generating key...")
     
-    if product in auto_products:
+    if check_use_api(product):
         delivered_key = await generate_key_from_api(product, duration_label)
     else:
         dict_key = f"{product}_{duration_label}"
@@ -980,24 +1060,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "admin_add_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
-        keyboard = [
-            [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
-            [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
-            [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-            [InlineKeyboardButton("BOOYAH", callback_data="bulk_prod_boyyah"), InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx")],
-            [InlineKeyboardButton("STREAMER-X PRO", callback_data="bulk_prod_streamerpro"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
-            [InlineKeyboardButton("GREED", callback_data="bulk_prod_greed"), InlineKeyboardButton("PRIME HOOK (.SH )", callback_data="bulk_prod_primehook")],
-            [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
-            [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
-            [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("VIPER", callback_data="bulk_prod_viper")],
-            [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
-            [InlineKeyboardButton("HWAK", callback_data="bulk_prod_hwak")],
-            [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
-        ]
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [
+                [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
+                [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
+                [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
+                [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
+                [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
+                [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
+                [InlineKeyboardButton("HWAK", callback_data="bulk_prod_hwak")],
+                [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer")],
+                [InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx"), InlineKeyboardButton("BOOYAH PANEL", callback_data="bulk_prod_boyyah")],
+                [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
+                [InlineKeyboardButton("GREED PANEL", callback_data="bulk_prod_greed"), InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro")],
+                [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("XYZ SUPREME", callback_data="bulk_prod_xyz")],
+                [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
+            ]
+            context.user_data["state"] = "awaiting_bulk_product"
+            await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            return
+
+        all_buttons = []
+        for wp in web_products:
+            name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+            callback = f"bulk_prod_{wp.get('name', '').lower()}"
+            all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
+            
+        keyboard = []
+        for i in range(0, len(all_buttons), 2):
+            keyboard.append(all_buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")])
         context.user_data["state"] = "awaiting_bulk_product"
         await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
-        
+
     if data.startswith("bulk_prod_"):
         if update.effective_user.id not in settings["admin_ids"]: return
         product = data.split("_")[2]
@@ -1178,8 +1275,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         await query.message.delete()
         
-        if user_bal >= float_amount:
-            title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>" if is_reseller else "✅ <b>SUFFICIENT BALANCE</b>"
+        is_admin = query.from_user.id in settings.get("admin_ids", [])
+        if is_admin or user_bal >= float_amount:
+            if is_admin:
+                title = "👑 <b>ADMIN CHECKOUT</b>"
+            elif is_reseller:
+                title = "👑 <b>VIP RESELLER CHECKOUT (30% OFF)</b>"
+            else:
+                title = "✅ <b>SUFFICIENT BALANCE</b>"
             full_payment_text = (
                 "<b>Status:</b> <code>Ready to Checkout</code>\n"
                 "<i>Pay using your Wallet Balance.</i>\n\n"
@@ -1247,15 +1350,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id_str = str(query.from_user.id)
         balances = load_balances()
         user_bal = balances.get(user_id_str, 0.0)
+        is_admin = query.from_user.id in settings.get("admin_ids", [])
         
-        if user_bal >= amount:
-            balances[user_id_str] -= amount
-            save_balances(balances)
+        if is_admin or user_bal >= amount:
+            if not is_admin:
+                balances[user_id_str] -= amount
+                save_balances(balances)
             
-            auto_products = ["hxn", "prime", "harshil"]
             delivered_key = None
             
-            if product in auto_products:
+            if check_use_api(product):
                 delivered_key = await generate_key_from_api(product, duration_label)
             else:
                 dict_key = f"{product}_{duration_label}"
@@ -1265,20 +1369,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     save_keys(keys)
             
             if delivered_key:
+                remaining_bal = user_bal if is_admin else balances[user_id_str]
                 success_msg = (
                     "✅ <b>PURCHASE SUCCESSFUL!</b>\n"
                     "━━━━━━━━━━━━━━━━━━\n"
                     f"🏺 <b>Product:</b> {product.upper()}\n"
                     f"⏳ <b>Duration:</b> {duration_label.upper()}\n"
-                    f"💰 <b>Remaining Balance:</b> ₹{balances[user_id_str]:.2f}\n"
+                    f"💰 <b>Remaining Balance:</b> ₹{remaining_bal:.2f}\n"
                     "━━━━━━━━━━━━━━━━━━\n"
                     f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                     "<i>Thank you for shopping with us!</i>"
                 )
                 await query.edit_message_text(text=success_msg, parse_mode="HTML")
             else:
-                balances[user_id_str] += amount
-                save_balances(balances)
+                if not is_admin:
+                    balances[user_id_str] += amount
+                    save_balances(balances)
                 await query.answer(f"❌ ERROR! Out of stock for {product.upper()}. Balance refunded.", show_alert=True)
                 await query.edit_message_text("❌ Payment refunded due to out-of-stock. Please contact Admin.")
         else:
@@ -1316,13 +1422,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product = parts[2].lower()
         order_id = parts[3]
         
+        admin_name = query.from_user.first_name
+        
+        status, processed_by = check_order_status(order_id)
+        if status != "pending":
+            await query.answer(f"⚠️ This order has already been {status} by {processed_by}!", show_alert=True)
+            return
+            
         # Get duration from user_data (stored when they clicked the plan)
         duration_label = context.user_data.get("duration", "1d")
         
         # 1. GENERATE OR FETCH KEY
-        auto_products = ["hxn", "prime", "harshil"]
-        
-        if product in auto_products:
+        if check_use_api(product):
             delivered_key = await generate_key_from_api(product, duration_label)
         else:
             dict_key = f"{product}_{duration_label}"
@@ -1348,25 +1459,87 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
                 
-                # Update Admin Message
+                # Update all Admin Messages
+                order_data = load_admin_order_messages().get(order_id, {})
+                messages = order_data.get("messages", [])
+                is_photo = order_data.get("is_photo", False)
+                original_text = order_data.get("original_text", "")
+                
+                if not original_text:
+                    original_text = query.message.caption if is_photo else query.message.text
+                
                 update_text = (
-                    f"✅ <b>APPROVED & KEY SENT</b>\n"
+                    f"\n\n✅ <b>APPROVED & KEY SENT by {admin_name}</b>\n"
                     f"🔑 <b>Generated:</b> <code>{delivered_key}</code>"
                 )
-                if query.message.photo:
-                    await query.edit_message_caption(caption=query.message.caption + f"\n\n{update_text}", parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=query.message.text + f"\n\n{update_text}", parse_mode="HTML")
+                new_msg_text = original_text + update_text
+                
+                save_admin_order_messages(order_id, messages, status="approved", processed_by=admin_name, is_photo=is_photo, original_text=original_text)
+                
+                for msg_info in messages:
+                    c_id = msg_info["chat_id"]
+                    m_id = msg_info["message_id"]
+                    try:
+                        if int(c_id) == query.from_user.id:
+                            if is_photo:
+                                await context.bot.edit_message_caption(chat_id=c_id, message_id=m_id, caption=new_msg_text, reply_markup=None, parse_mode="HTML")
+                            else:
+                                await context.bot.edit_message_text(chat_id=c_id, message_id=m_id, text=new_msg_text, reply_markup=None, parse_mode="HTML")
+                        else:
+                            await context.bot.delete_message(chat_id=c_id, message_id=m_id)
+                    except Exception as e:
+                        logger.error(f"Failed to update/delete message for admin {c_id}: {e}")
             except Exception as e:
                 await query.answer(f"Error sending key: {e}", show_alert=True)
         else:
             await query.answer(f"❌ ERROR! Could not generate or find a key for {product.upper()}. Out of stock?", show_alert=True)
 
     elif data.startswith("reject_"):
-        target_user_id = int(data.split("_")[1])
+        parts = data.split("_")
+        target_user_id = int(parts[1])
+        order_id = parts[2] if len(parts) > 2 else None
+        
+        admin_name = query.from_user.first_name
+        
+        if order_id:
+            status, processed_by = check_order_status(order_id)
+            if status != "pending":
+                await query.answer(f"⚠️ This order has already been {status} by {processed_by}!", show_alert=True)
+                return
+                
         try:
             await context.bot.send_message(chat_id=target_user_id, text="❌ <b>Payment Rejected!</b>\nYour payment could not be verified. Please contact support if you think this is a mistake.", parse_mode="HTML")
-            await query.edit_message_caption(caption=query.message.caption + "\n\n❌ <b>REJECTED</b>") if query.message.photo else await query.edit_message_text(text=query.message.text + "\n\n❌ <b>REJECTED</b>")
+            
+            if order_id:
+                order_data = load_admin_order_messages().get(order_id, {})
+                messages = order_data.get("messages", [])
+                is_photo = order_data.get("is_photo", False)
+                original_text = order_data.get("original_text", "")
+                
+                if not original_text:
+                    original_text = query.message.caption if is_photo else query.message.text
+                
+                update_text = f"\n\n❌ <b>REJECTED by {admin_name}</b>"
+                new_msg_text = original_text + update_text
+                
+                save_admin_order_messages(order_id, messages, status="rejected", processed_by=admin_name, is_photo=is_photo, original_text=original_text)
+                
+                for msg_info in messages:
+                    c_id = msg_info["chat_id"]
+                    m_id = msg_info["message_id"]
+                    try:
+                        if int(c_id) == query.from_user.id:
+                            if is_photo:
+                                await context.bot.edit_message_caption(chat_id=c_id, message_id=m_id, caption=new_msg_text, reply_markup=None, parse_mode="HTML")
+                            else:
+                                await context.bot.edit_message_text(chat_id=c_id, message_id=m_id, text=new_msg_text, reply_markup=None, parse_mode="HTML")
+                        else:
+                            await context.bot.delete_message(chat_id=c_id, message_id=m_id)
+                    except Exception as e:
+                        logger.error(f"Failed to update/delete message for admin {c_id}: {e}")
+            else:
+                # Fallback for old reject callbacks
+                await query.edit_message_caption(caption=query.message.caption + "\n\n❌ <b>REJECTED</b>") if query.message.photo else await query.edit_message_text(text=query.message.text + "\n\n❌ <b>REJECTED</b>")
         except Exception as e:
             await query.answer(f"Error notifying user: {e}", show_alert=True)
     elif data.startswith("refresh_"):
@@ -1409,9 +1582,231 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
             [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
             [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_prod_mgmt":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        keyboard = [
+            [InlineKeyboardButton("➕ Add Product", callback_data="admin_add_product_start")],
+            [InlineKeyboardButton("⚙️ Manage Products", callback_data="admin_manage_list")],
+            [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text("📦 <b>Product Management Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_manage_list":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No active products found to manage.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        buttons = []
+        for wp in web_products:
+            name = wp.get("display_name") or wp.get("name", "").upper()
+            cb = f"admin_prod_opt_{wp.get('name', '').lower()}"
+            buttons.append(InlineKeyboardButton(name, callback_data=cb))
+        keyboard = []
+        for i in range(0, len(buttons), 2):
+            keyboard.append(buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")])
+        await query.edit_message_text("⚙️ <b>Select a product to manage:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_prod_opt_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = "_".join(data.split("_")[3:])
+        web_products = load_web_products()
+        wp = next((p for p in web_products if p.get("name", "").lower() == prod_name.lower()), None)
+        if not wp:
+            await query.answer("❌ Product not found.", show_alert=True)
+            return
+        display_name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+        use_api = wp.get("use_api", False)
+        section = wp.get("section", "Both")
+        
+        status_text = "CONNECTED ✅ (Generates key from Alwaysdata API)" if use_api else "DISABLED ❌ (Uses local stock keys)"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔌 Toggle API Connection", callback_data=f"admin_prod_tglapi_{prod_name}")],
+            [InlineKeyboardButton("🗑️ Remove / Delete Product", callback_data=f"admin_rmsel_{prod_name}")],
+            [InlineKeyboardButton("« Back to List", callback_data="admin_manage_list")]
+        ]
+        await query.edit_message_text(
+            f"⚙️ <b>PRODUCT SETTINGS: {display_name}</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Name:</b> {wp.get('name', '')}\n"
+            f"📁 <b>Section:</b> {section}\n"
+            f"🔌 <b>Alwaysdata API:</b> {status_text}\n"
+            f"💡 <i>(Note: Alwaysdata API uses product_id = 1 for all queries)</i>\n"
+            "━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data.startswith("admin_prod_tglapi_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = "_".join(data.split("_")[3:])
+        web_products = load_web_products()
+        changed = False
+        for wp in web_products:
+            if wp.get("name", "").lower() == prod_name.lower():
+                current_val = wp.get("use_api", False)
+                wp["use_api"] = not current_val
+                wp["product_id"] = 1
+                changed = True
+                break
+        if changed:
+            save_web_products(web_products)
+            await query.answer("✅ API Connection Toggled!")
+            wp = next((p for p in web_products if p.get("name", "").lower() == prod_name.lower()), None)
+            display_name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+            use_api = wp.get("use_api", False)
+            section = wp.get("section", "Both")
+            status_text = "CONNECTED ✅ (Generates key from Alwaysdata API)" if use_api else "DISABLED ❌ (Uses local stock keys)"
+            keyboard = [
+                [InlineKeyboardButton("🔌 Toggle API Connection", callback_data=f"admin_prod_tglapi_{prod_name}")],
+                [InlineKeyboardButton("🗑️ Remove / Delete Product", callback_data=f"admin_rmsel_{prod_name}")],
+                [InlineKeyboardButton("« Back to List", callback_data="admin_manage_list")]
+            ]
+            await query.edit_message_text(
+                f"⚙️ <b>PRODUCT SETTINGS: {display_name}</b>\n━━━━━━━━━━━━━━━━━━\n"
+                f"📦 <b>Name:</b> {wp.get('name', '')}\n"
+                f"📁 <b>Section:</b> {section}\n"
+                f"🔌 <b>Alwaysdata API:</b> {status_text}\n"
+                f"💡 <i>(Note: Alwaysdata API uses product_id = 1 for all queries)</i>\n"
+                "━━━━━━━━━━━━━━━━━━",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
+        else:
+            await query.answer("❌ Product not found.", show_alert=True)
+    elif data == "admin_add_product_start":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_new_product_name"
+        keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text("✏️ <b>Enter the name of the new product:</b>\n(e.g., kiwmodz exe)", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_add_product_sec_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        section_type = data.split("_")[4]
+        prod_name = context.user_data.get("new_product_name")
+        if not prod_name:
+            await query.answer("❌ Session expired. Please try again.", show_alert=True)
+            return
+        sec_map = {
+            "trial": "Trial Only",
+            "selling": "Selling Only",
+            "both": "Both"
+        }
+        section_val = sec_map.get(section_type, "Both")
+        web_products = load_web_products()
+        new_prod = {
+            "name": prod_name,
+            "display_name": prod_name.upper(),
+            "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
+            "status": "Active",
+            "section": section_val
+        }
+        web_products.append(new_prod)
+        save_web_products(web_products)
+        
+        keys = load_keys()
+        for dur in ["1d", "7d", "15d", "30d", "trial"]:
+            dict_key = f"{prod_name}_{dur}"
+            if dict_key not in keys:
+                keys[dict_key] = []
+        save_keys(keys)
+        
+        keyboard = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(
+            f"✅ <b>PRODUCT ADDED SUCCESSFULLY!</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Name:</b> {prod_name.upper()}\n"
+            f"📁 <b>Section:</b> {section_val}\n"
+            f"💰 <b>Default Prices:</b> 1d: 50, 7d: 200, 15d: 400, 30d: 600\n"
+            f"📈 <b>Stock Initialized:</b> empty keys added to database\n"
+            "━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data == "admin_remove_product_start":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No active products found to remove.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        buttons = []
+        for wp in web_products:
+            name = wp.get("display_name") or wp.get("name", "").upper()
+            cb = f"admin_rmsel_{wp.get('name', '').lower()}"
+            buttons.append(InlineKeyboardButton(name, callback_data=cb))
+        keyboard = []
+        for i in range(0, len(buttons), 2):
+            keyboard.append(buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")])
+        await query.edit_message_text("🗑️ <b>Select a product to remove:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_rmsel_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = "_".join(data.split("_")[2:])
+        keyboard = [
+            [InlineKeyboardButton("Remove from Trial Only", callback_data=f"admin_rmact_{prod_name}_trial")],
+            [InlineKeyboardButton("Remove from Selling Only", callback_data=f"admin_rmact_{prod_name}_selling")],
+            [InlineKeyboardButton("Remove Completely (With Stock)", callback_data=f"admin_rmact_{prod_name}_both")],
+            [InlineKeyboardButton("« Back", callback_data="admin_remove_product_start")]
+        ]
+        await query.edit_message_text(
+            f"❓ <b>How do you want to remove {prod_name.upper()}?</b>\n\n"
+            "• <b>Trial Only:</b> Remove from Trial menu but keep in Selling menu.\n"
+            "• <b>Selling Only:</b> Remove from Shop/Selling menu but keep in Trial menu.\n"
+            "• <b>Remove Completely:</b> Fully delete the product and clear all stock keys from database.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data.startswith("admin_rmact_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        parts = data.split("_")
+        prod_name = "_".join(parts[2:-1])
+        action = parts[-1]
+        web_products = load_web_products()
+        updated_products = []
+        removed_completely = False
+        section_changed_to = None
+        for wp in web_products:
+            if wp.get("name", "").lower() == prod_name.lower():
+                current_sec = wp.get("section", "Both")
+                if action == "trial":
+                    if current_sec == "Both":
+                        wp["section"] = "Selling Only"
+                        section_changed_to = "Selling Only"
+                        updated_products.append(wp)
+                    elif current_sec == "Trial Only":
+                        removed_completely = True
+                    else:
+                        updated_products.append(wp)
+                elif action == "selling":
+                    if current_sec == "Both":
+                        wp["section"] = "Trial Only"
+                        section_changed_to = "Trial Only"
+                        updated_products.append(wp)
+                    elif current_sec == "Selling Only":
+                        removed_completely = True
+                    else:
+                        updated_products.append(wp)
+                elif action == "both":
+                    removed_completely = True
+            else:
+                updated_products.append(wp)
+        save_web_products(updated_products)
+        if removed_completely:
+            keys = load_keys()
+            to_delete = [k for k in keys if k.startswith(f"{prod_name}_") or k == prod_name]
+            for k in to_delete:
+                keys.pop(k, None)
+            save_keys(keys)
+            msg_text = f"✅ <b>{prod_name.upper()}</b> has been completely removed along with all its stock keys."
+        else:
+            if section_changed_to:
+                msg_text = f"✅ <b>{prod_name.upper()}</b> section has been updated to <b>{section_changed_to}</b>."
+            else:
+                msg_text = f"✅ No changes were needed for <b>{prod_name.upper()}</b>."
+        keyboard = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(msg_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     elif data == "admin_help_commands":
         if update.effective_user.id not in settings["admin_ids"]: return
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
@@ -1556,7 +1951,77 @@ async def reset_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_settings(settings)
     await update.message.reply_text("✅ <b>All Force Join channels have been removed!</b>", parse_mode="HTML")
 
+def ensure_default_products():
+    try:
+        products = load_web_products()
+        display_map = {
+            "hxn": "HXN CHEAT",
+            "lk": "LK TEAM",
+            "hex": "HEX BLADE",
+            "alpha": "ALPHA-X-STORE",
+            "prime": "PRIME X CHEAT",
+            "harshil": "HARSHIL MODS",
+            "trinity": "TRINITY X ROOT",
+            "fluorite": "FLUORITE ANDROID",
+            "svj": "SVJ CHEATS",
+            "brmods": "BR MODS",
+            "beyond": "BEYOND CHEATS",
+            "rogerio": "ROGERIO MODS",
+            "hwak": "HAWK CHEATS",
+            "rapid": "RAPID CORE",
+            "daemon": "DAEMON PHONK",
+            "hxnstreamer": "HXN STREAMER (.SH)",
+            "bs": "BS SECURE LOADER",
+            "hydra": "HYDRA ENGINE 8BP",
+            "xtffh4x_streamer": "XTFFH4X STREAMER",
+            "streamerx": "STREAMER X",
+            "boyyah": "BOOYAH PANEL",
+            "eliteteam": "ELITE TEAM",
+            "ngo": "NGO TRAN",
+            "greed": "GREED PANEL",
+            "lkpro": "LK TEAM PRO",
+            "kiwmodz": "KIWMODZ EXE",
+            "xyz": "XYZ SUPREME"
+        }
+        changed = False
+        for wp in products:
+            pname = wp.get("name", "").lower()
+            if pname in display_map and not wp.get("display_name"):
+                wp["display_name"] = display_map[pname]
+                changed = True
+        existing_names = {wp.get("name", "").lower() for wp in products}
+        for name_id, display_name in display_map.items():
+            if name_id not in existing_names:
+                products.append({
+                    "name": name_id,
+                    "display_name": display_name,
+                    "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
+                    "status": "Active",
+                    "section": "Both"
+                })
+                changed = True
+        if changed:
+            save_web_products(products)
+            print("Successfully populated missing default products into database.")
+    except Exception as e:
+        print(f"Error populating default products: {e}")
+
 async def run_bot():
+    ensure_default_products()
+    try:
+        keys_db = load_keys()
+        purged = False
+        if isinstance(keys_db, dict):
+            for k in list(keys_db.keys()):
+                if "hotstreamer" in k.lower() or "hot_streamer" in k.lower():
+                    del keys_db[k]
+                    purged = True
+            if purged:
+                save_keys(keys_db)
+                print("Purged deleted product keys (hot streamer) from DB.")
+    except Exception as e:
+        print(f"Error purging keys: {e}")
+
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
@@ -1594,6 +2059,3 @@ if __name__ == "__main__":
         asyncio.run(run_bot())
     except KeyboardInterrupt:
         print("Stopped.")
- 
-if True:
-    raise ValueError('Corrupted API signature detected.')

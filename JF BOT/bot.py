@@ -63,6 +63,17 @@ def load_web_products():
 def save_web_products(products):
     set_cached("web_products", products)
 
+def check_use_api(product):
+    try:
+        products = load_web_products()
+        for p in products:
+            if p.get("name", "").lower() == product.lower():
+                if p.get("use_api") is not None:
+                    return p.get("use_api")
+    except Exception as e:
+        logger.error(f"Error checking check_use_api: {e}")
+    return product.lower() in ["hxn", "prime", "harshil", "hxnmodule"]
+
 def log_activity(user_id, action):
     doc = jf_col.find_one({"_id": "bot_activity_logs"})
     logs = doc.get("data", []) if doc else []
@@ -472,7 +483,7 @@ async def create_upigateway_order(amount, order_id, user_name):
             
     return None
 
-async def generate_key_from_api(product, duration_label):
+async def generate_key_from_api(product, duration_label, product_id=None):
     """Calls the Alwaysdata API to generate a real key."""
     api_url = "https://harshilexe.alwaysdata.net/api/generate.php"
     api_secret = "hxn_secret_12345"
@@ -487,18 +498,10 @@ async def generate_key_from_api(product, duration_label):
     }
     site_duration = duration_map.get(duration_label, "1 Day")
     
-    # Map products to IDs (You can add more later)
-    product_map = {
-        "hxn": 1,
-        "prime": 1,
-        "harshil": 1,
-        "streamerxsh": 1
-    }
-    product_id = product_map.get(product.lower(), 1)
-    
+    # All API queries use product_id = 1 as per user's instructions
     params = {
         "secret": api_secret,
-        "product_id": product_id,
+        "product_id": 1,
         "duration": site_duration,
         "amount": 1,
         "max_devices": 1
@@ -1368,12 +1371,11 @@ async def gen_key_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product = context.args[0].lower()
     duration_label = context.args[1].lower()
     
-    auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
     delivered_key = None
     
     status_msg = await update.message.reply_text("🔄 Generating key...")
     
-    if product in auto_products:
+    if check_use_api(product):
         delivered_key = await generate_key_from_api(product, duration_label)
     else:
         dict_key = f"{product}_{duration_label}"
@@ -2410,10 +2412,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     balances[user_id_str] -= amount
                     save_balances(balances)
             
-                auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
                 delivered_key = None
             
-                if product in auto_products:
+                if check_use_api(product):
                     delivered_key = await generate_key_from_api(product, duration_label)
                 else:
                     dict_key = f"{product}_{duration_label}"
@@ -2544,9 +2545,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # 1. GENERATE OR FETCH KEY
-        auto_products = ["hxn", "prime", "harshil", "streamerxsh"]
-        
-        if product in auto_products:
+        if check_use_api(product):
             delivered_key = await generate_key_from_api(product, duration_label)
         else:
             dict_key = f"{product}_{duration_label}"
@@ -2720,10 +2719,93 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user.id not in settings["admin_ids"]: return
         keyboard = [
             [InlineKeyboardButton("➕ Add Product", callback_data="admin_add_product_start")],
-            [InlineKeyboardButton("➖ Remove Product", callback_data="admin_remove_product_start")],
+            [InlineKeyboardButton("⚙️ Manage Products", callback_data="admin_manage_list")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         await query.edit_message_text("📦 <b>Product Management Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_manage_list":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        web_products = load_web_products()
+        if not web_products:
+            keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No active products found to manage.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        buttons = []
+        for wp in web_products:
+            name = wp.get("display_name") or wp.get("name", "").upper()
+            cb = f"admin_prod_opt_{wp.get('name', '').lower()}"
+            buttons.append(InlineKeyboardButton(name, callback_data=cb))
+        keyboard = []
+        for i in range(0, len(buttons), 2):
+            keyboard.append(buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")])
+        await query.edit_message_text("⚙️ <b>Select a product to manage:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_prod_opt_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = "_".join(data.split("_")[3:])
+        web_products = load_web_products()
+        wp = next((p for p in web_products if p.get("name", "").lower() == prod_name.lower()), None)
+        if not wp:
+            await query.answer("❌ Product not found.", show_alert=True)
+            return
+        display_name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+        use_api = wp.get("use_api", False)
+        section = wp.get("section", "Both")
+        
+        status_text = "CONNECTED ✅ (Generates key from Alwaysdata API)" if use_api else "DISABLED ❌ (Uses local stock keys)"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔌 Toggle API Connection", callback_data=f"admin_prod_tglapi_{prod_name}")],
+            [InlineKeyboardButton("🗑️ Remove / Delete Product", callback_data=f"admin_rmsel_{prod_name}")],
+            [InlineKeyboardButton("« Back to List", callback_data="admin_manage_list")]
+        ]
+        await query.edit_message_text(
+            f"⚙️ <b>PRODUCT SETTINGS: {display_name}</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Name:</b> {wp.get('name', '')}\n"
+            f"📁 <b>Section:</b> {section}\n"
+            f"🔌 <b>Alwaysdata API:</b> {status_text}\n"
+            f"💡 <i>(Note: Alwaysdata API uses product_id = 1 for all queries)</i>\n"
+            "━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data.startswith("admin_prod_tglapi_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = "_".join(data.split("_")[3:])
+        web_products = load_web_products()
+        changed = False
+        for wp in web_products:
+            if wp.get("name", "").lower() == prod_name.lower():
+                current_val = wp.get("use_api", False)
+                wp["use_api"] = not current_val
+                wp["product_id"] = 1
+                changed = True
+                break
+        if changed:
+            save_web_products(web_products)
+            await query.answer("✅ API Connection Toggled!")
+            wp = next((p for p in web_products if p.get("name", "").lower() == prod_name.lower()), None)
+            display_name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+            use_api = wp.get("use_api", False)
+            section = wp.get("section", "Both")
+            status_text = "CONNECTED ✅ (Generates key from Alwaysdata API)" if use_api else "DISABLED ❌ (Uses local stock keys)"
+            keyboard = [
+                [InlineKeyboardButton("🔌 Toggle API Connection", callback_data=f"admin_prod_tglapi_{prod_name}")],
+                [InlineKeyboardButton("🗑️ Remove / Delete Product", callback_data=f"admin_rmsel_{prod_name}")],
+                [InlineKeyboardButton("« Back to List", callback_data="admin_manage_list")]
+            ]
+            await query.edit_message_text(
+                f"⚙️ <b>PRODUCT SETTINGS: {display_name}</b>\n━━━━━━━━━━━━━━━━━━\n"
+                f"📦 <b>Name:</b> {wp.get('name', '')}\n"
+                f"📁 <b>Section:</b> {section}\n"
+                f"🔌 <b>Alwaysdata API:</b> {status_text}\n"
+                f"💡 <i>(Note: Alwaysdata API uses product_id = 1 for all queries)</i>\n"
+                "━━━━━━━━━━━━━━━━━━",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
+        else:
+            await query.answer("❌ Product not found.", show_alert=True)
     elif data == "admin_add_product_start":
         if update.effective_user.id not in settings["admin_ids"]: return
         context.user_data["state"] = "awaiting_new_product_name"
