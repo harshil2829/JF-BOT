@@ -537,6 +537,37 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     
     
+    if state == "awaiting_new_product_name":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = update.message.text.strip() if update.message.text else ""
+        if not prod_name:
+            await update.message.reply_text("❌ Invalid name. Please send a valid product name:")
+            return
+            
+        prod_key = prod_name.lower().replace(" ", "")
+        products = load_products()
+        exists = any(p["key"] == prod_key for p in products)
+        if exists:
+            await update.message.reply_text(f"⚠️ Product with key <code>{prod_key}</code> already exists. Enter another name or cancel:")
+            return
+            
+        products.append({"key": prod_key, "name": prod_name})
+        settings["products"] = products
+        save_settings(settings)
+        
+        # Initialize keys stock in DB
+        keys = load_keys()
+        for dur in ["1d", "3d", "7d", "15d", "30d", "trial"]:
+            dict_key = f"{prod_key}_{dur}"
+            if dict_key not in keys:
+                keys[dict_key] = []
+        save_keys(keys)
+        
+        context.user_data["state"] = None
+        kb = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await update.message.reply_text(f"✅ Product <b>{prod_name}</b> (<code>{prod_key}</code>) has been added successfully!", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        return
+
     if state == "awaiting_manual_upi":
         if update.effective_user.id not in settings["admin_ids"]: return
         new_val = update.message.text.strip()
@@ -752,7 +783,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
                     [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-                    [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+                    [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
                     [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
                     [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
                 ]
@@ -880,7 +911,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
         [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
         [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-        [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+        [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
         [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
         [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
     ]
@@ -1517,18 +1548,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     if data == "admin_add_keys":
-        if update.effective_user.id not in settings["admin_ids"]: return
-        products = load_products()
-        keyboard = []
-        for i in range(0, len(products), 2):
-            row = []
-            row.append(InlineKeyboardButton(products[i]["name"], callback_data=f"bulk_prod_{products[i]['key']}"))
-            if i+1 < len(products):
-                row.append(InlineKeyboardButton(products[i+1]["name"], callback_data=f"bulk_prod_{products[i+1]['key']}"))
-            keyboard.append(row)
-        keyboard.append([InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")])
-        context.user_data["state"] = "awaiting_bulk_product"
-        await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
     if data.startswith("bulk_prod_"):
@@ -2311,7 +2330,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
             [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-            [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
             [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
             [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
         ]
@@ -2336,7 +2355,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
             [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-            [InlineKeyboardButton("📊 Shop setup", callback_data="admin_shop_setup_placeholder"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
             [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
             [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
         ]
@@ -2452,20 +2471,68 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
         await query.edit_message_text(f"Please enter the new Minimum Refer limit (current: <code>{current}</code>):", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
 
-    elif data == "admin_shop_setup_placeholder":
+    elif data == "admin_prod_mgmt":
         if update.effective_user.id not in settings["admin_ids"]: return
-        kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        keyboard = [
+            [InlineKeyboardButton("➕ Add Product", callback_data="admin_add_product_start")],
+            [InlineKeyboardButton("➖ Remove Product", callback_data="admin_remove_product_start")],
+            [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text("📦 <b>Product Management Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_add_product_start":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        context.user_data["state"] = "awaiting_new_product_name"
+        keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text("✏️ <b>Enter the name of the new product:</b>\n(e.g., kiwmodz exe)", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_remove_product_start":
+        if update.effective_user.id not in settings["admin_ids"]: return
         products = load_products()
-        prod_text = "\n".join([f"• {p['name']} (key: <code>{p['key']}</code>)" for p in products])
-        text = (
-            "📊 <b>Shop Setup</b>\n━━━━━━━━━━━━━━━━━━\n"
-            f"Current products:\n{prod_text}\n\n"
-            "To add a product, use command:\n"
-            "<code>/add_product [key] [name]</code>\n"
-            "To delete a product, use command:\n"
-            "<code>/del_product [key]</code>"
+        if not products:
+            keyboard = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No active products found to remove.", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        buttons = []
+        for p in products:
+            name = p.get("name", "").upper()
+            cb = f"admin_rmsel_{p.get('key', '').lower()}"
+            buttons.append(InlineKeyboardButton(name, callback_data=cb))
+        keyboard = []
+        for i in range(0, len(buttons), 2):
+            keyboard.append(buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")])
+        await query.edit_message_text("🗑️ <b>Select a product to remove:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_rmsel_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_key = "_".join(data.split("_")[2:])
+        keyboard = [
+            [InlineKeyboardButton("✅ Yes, Delete", callback_data=f"admin_rmact_{prod_key}_both")],
+            [InlineKeyboardButton("« Back", callback_data="admin_remove_product_start")]
+        ]
+        await query.edit_message_text(
+            f"❓ <b>Are you sure you want to completely delete {prod_key.upper()} and all its stock keys?</b>",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
         )
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    elif data.startswith("admin_rmact_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        parts = data.split("_")
+        prod_key = "_".join(parts[2:-1])
+        action = parts[-1]
+        
+        products = load_products()
+        new_products = [p for p in products if p.get("key", "").lower() != prod_key.lower()]
+        settings["products"] = new_products
+        save_settings(settings)
+        
+        # Clear keys from database
+        keys = load_keys()
+        to_delete = [k for k in keys if k.startswith(f"{prod_key}_") or k == prod_key]
+        for k in to_delete:
+            keys.pop(k, None)
+        save_keys(keys)
+        
+        kb = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(f"✅ <b>{prod_key.upper()}</b> has been completely removed along with all its stock keys.", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
         
     elif data == "admin_channel_setup_placeholder":
         if update.effective_user.id not in settings["admin_ids"]: return
@@ -2488,20 +2555,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_help_commands":
         if update.effective_user.id not in settings["admin_ids"]: return
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
+        
+        # Load admins
+        admin_ids = settings.get("admin_ids", [])
+        
+        # Load activity logs
+        doc = jf_col.find_one({"_id": "bot_activity_logs"})
+        logs = doc.get("data", []) if doc else []
+        
+        admin_list_text = "\n".join([f"• <code>{aid}</code>" for aid in admin_ids])
+        
+        activity_text = ""
+        for log in logs[-10:]: # last 10 activities
+            uid = log.get("uid")
+            action = log.get("action")
+            ltime = log.get("time")
+            activity_text += f"⏰ {ltime} - User <code>{uid}</code>: {action}\n"
+        if not activity_text:
+            activity_text = "No recent activity logged."
+            
         help_text = (
-            "❓ <b>ADMIN SLASH COMMANDS</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "💬 <code>/set_welcome [text]</code> - Update welcome message\n"
-            "👤 <code>/add_admin [telegram_id]</code> - Add new admin\n"
-            "💰 <code>/add_balance [user_id] [amount]</code> - Add balance\n"
-            "➕ <code>/add_reseller [user_id] [days]</code> - Add VIP reseller\n"
-            "➖ <code>/remove_reseller [user_id]</code> - Remove reseller\n"
-            "👑 <code>/resellers</code> - List active resellers\n"
-            "📜 <code>/rlogs [user_id]</code> - Check reseller activity logs\n"
-            "📢 <code>/broadcast [message]</code> - Send message to all users\n"
-            "🔑 <code>/add_key [product] [duration] [key]</code> - Add single key\n"
-            "📦 <code>/stock</code> - Check stock levels\n"
-            "🔒 <code>/lock_trial [optional: product] [optional: msg]</code> - Lock trials"
+            f"👑 <b>ADMIN MANAGEMENT & ACTIVITY</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"👥 <b>Total Admins:</b> {len(admin_ids)}\n"
+            f"{admin_list_text}\n\n"
+            f"📜 <b>Recent Bot/Admin Activity:</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{activity_text}\n"
         )
         await query.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_add":
