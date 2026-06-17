@@ -359,7 +359,7 @@ async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE)
         trials = load_trials()
         if user_id not in trials:
             trials[user_id] = {"last_trial": 0, "strikes": 0, "banned": False}
-        trials[user_id]["strikes"] += 1
+        trials[user_id]["strikes"] = trials[user_id].get("strikes", 0) + 1
         if trials[user_id]["strikes"] >= 3:
             trials[user_id]["banned"] = True
         save_trials(trials)
@@ -1879,21 +1879,73 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("bulk_prod_"):
         if update.effective_user.id not in settings["admin_ids"]: return
-        product = data.split("_")[2]
+        product = "_".join(data.split("_")[2:])
         context.user_data["bulk_product"] = product
+        keys = load_keys()
+        # Count stock per duration
+        stock_1d = len(keys.get(f"{product}_1d", []))
+        stock_7d = len(keys.get(f"{product}_7d", []))
+        stock_15d = len(keys.get(f"{product}_15d", []))
+        stock_30d = len(keys.get(f"{product}_30d", []))
+        stock_trial = len(keys.get(f"{product}_trial", []))
+        total = stock_1d + stock_7d + stock_15d + stock_30d + stock_trial
         keyboard = [
-            [InlineKeyboardButton("1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton("7 Days", callback_data="bulk_dur_7d")],
-            [InlineKeyboardButton("15 Days", callback_data="bulk_dur_15d"), InlineKeyboardButton("30 Days", callback_data="bulk_dur_30d")],
-            [InlineKeyboardButton("Trial Keys", callback_data="bulk_dur_trial")],
-            [InlineKeyboardButton("🗑️ Clear All Stock", callback_data=f"clear_stock_{product}")],
+            [InlineKeyboardButton(f"➕ 1 Day", callback_data="bulk_dur_1d"), InlineKeyboardButton(f"➕ 7 Days", callback_data="bulk_dur_7d")],
+            [InlineKeyboardButton(f"➕ 15 Days", callback_data="bulk_dur_15d"), InlineKeyboardButton(f"➕ 30 Days", callback_data="bulk_dur_30d")],
+            [InlineKeyboardButton(f"➕ Trial Keys", callback_data="bulk_dur_trial")],
+            [InlineKeyboardButton(f"🗑 1D ({stock_1d})", callback_data=f"clrstk_{product}_1d"), InlineKeyboardButton(f"🗑 7D ({stock_7d})", callback_data=f"clrstk_{product}_7d")],
+            [InlineKeyboardButton(f"🗑 15D ({stock_15d})", callback_data=f"clrstk_{product}_15d"), InlineKeyboardButton(f"🗑 30D ({stock_30d})", callback_data=f"clrstk_{product}_30d")],
+            [InlineKeyboardButton(f"🗑 Trial ({stock_trial})", callback_data=f"clrstk_{product}_trial"), InlineKeyboardButton(f"🗑 ALL ({total})", callback_data=f"clrstk_{product}_all")],
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_add_keys")]
         ]
-        await query.edit_message_text(f"⏳ <b>Select Duration for {product.upper()}:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        await query.edit_message_text(
+            f"⏳ <b>{product.upper()}</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Current Stock:</b>\n"
+            f"• 1 Day: {stock_1d} keys\n"
+            f"• 7 Days: {stock_7d} keys\n"
+            f"• 15 Days: {stock_15d} keys\n"
+            f"• 30 Days: {stock_30d} keys\n"
+            f"• Trial: {stock_trial} keys\n"
+            f"• <b>Total: {total} keys</b>\n\n"
+            f"Select ➕ to add keys or 🗑 to clear stock:",
+            reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML"
+        )
         return
-        
+
+    if data.startswith("clrstk_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        parts = data.split("_")
+        # clrstk_{product}_{duration} - product can have underscores
+        duration = parts[-1]
+        product = "_".join(parts[1:-1])
+        keys = load_keys()
+        cleared_count = 0
+        if duration == "all":
+            for dur in ["1d", "3d", "7d", "15d", "30d", "trial"]:
+                dict_key = f"{product}_{dur}"
+                if dict_key in keys:
+                    cleared_count += len(keys[dict_key])
+                    del keys[dict_key]
+        else:
+            dict_key = f"{product}_{duration}"
+            if dict_key in keys:
+                cleared_count = len(keys[dict_key])
+                del keys[dict_key]
+        save_keys(keys)
+        dur_label = "ALL durations" if duration == "all" else duration.upper()
+        keyboard = [[InlineKeyboardButton("« Back", callback_data=f"bulk_prod_{product}")]]
+        await query.edit_message_text(
+            f"✅ <b>STOCK CLEARED</b>\n━━━━━━━━━━━━━━\n"
+            f"🏺 Product: <b>{product.upper()}</b>\n"
+            f"⏱ Duration: <b>{dur_label}</b>\n"
+            f"🗑 Deleted: <b>{cleared_count} keys</b>",
+            reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML"
+        )
+        return
+
     if data.startswith("clear_stock_"):
         if update.effective_user.id not in settings["admin_ids"]: return
-        product = data.split("_")[2]
+        product = "_".join(data.split("_")[2:])
         keys = load_keys()
         cleared_count = 0
         for dur in ["1d", "3d", "7d", "15d", "30d", "trial"]:
@@ -1902,7 +1954,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 cleared_count += len(keys[dict_key])
                 del keys[dict_key]
         save_keys(keys)
-        
         keyboard = [[InlineKeyboardButton("« Back", callback_data=f"bulk_prod_{product}")]]
         await query.edit_message_text(f"✅ <b>STOCK CLEARED</b>\n━━━━━━━━━━━━━━\nSuccessfully deleted {cleared_count} keys for {product.upper()}.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
@@ -3360,6 +3411,21 @@ def ensure_default_products():
         print(f"Error populating default products: {e}")
 
 async def run_bot():
+    # Re-ban all users who have 3+ strikes but are not currently banned
+    try:
+        trials = load_trials()
+        rebanned = 0
+        for uid, data in trials.items():
+            if data.get("strikes", 0) >= 3 and not data.get("banned", False):
+                data["banned"] = True
+                rebanned += 1
+        if rebanned > 0:
+            save_trials(trials)
+            print(f"Startup reban: {rebanned} users re-banned (had 3+ strikes but were not banned)")
+        banned_total = sum(1 for v in trials.values() if v.get("banned", False))
+        print(f"Total banned users: {banned_total}")
+    except Exception as e:
+        print(f"Error during startup reban: {e}")
     ensure_default_products()
     try:
         keys_db = load_keys()
