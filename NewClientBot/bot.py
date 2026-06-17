@@ -1559,6 +1559,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     if data == "admin_add_keys":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        products = load_products()
+        if not products:
+            keyboard = [[InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]]
+            await query.edit_message_text("❌ No products configured yet. Please add a product first.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            return
+        
+        all_buttons = []
+        for p in products:
+            name = p.get("name", "").upper()
+            callback = f"bulk_prod_{p.get('key', '').lower()}"
+            all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
+            
+        keyboard = []
+        for i in range(0, len(all_buttons), 2):
+            keyboard.append(all_buttons[i:i+2])
+        keyboard.append([InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")])
+        context.user_data["state"] = "awaiting_bulk_product"
+        await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
         
     if data.startswith("bulk_prod_"):
