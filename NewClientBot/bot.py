@@ -3030,15 +3030,28 @@ async def rperms_cmd(update, context):
     settings = load_settings()
     if user_id not in settings["admin_ids"]: return
     if len(context.args) < 2:
-        await update.message.reply_text("Usage: /rperms [reseller_id] [product1,product2 OR clear]\nExample: /rperms 123456789 hxn,hex,prime")
+        await update.message.reply_text("Usage:\n• Set list: <code>/rperms [reseller_id] hxn,hex</code>\n• Add: <code>/rperms [reseller_id] +prime</code>\n• Remove: <code>/rperms [reseller_id] -hex</code>\n• Clear all: <code>/rperms [reseller_id] clear</code>", parse_mode="HTML")
         return
     target_id = context.args[0]
     perms_str = context.args[1]
     perms = load_reseller_perms()
+    
+    current_perms = perms.get(target_id, [])
+    
     if perms_str.lower() == "clear":
         perms[target_id] = []
+    elif perms_str.startswith("+"):
+        to_add = [p.strip().lower() for p in perms_str[1:].split(",") if p.strip()]
+        for p in to_add:
+            if p not in current_perms:
+                current_perms.append(p)
+        perms[target_id] = current_perms
+    elif perms_str.startswith("-"):
+        to_remove = [p.strip().lower() for p in perms_str[1:].split(",") if p.strip()]
+        perms[target_id] = [p for p in current_perms if p.lower() not in to_remove]
     else:
-        perms[target_id] = [p.strip() for p in perms_str.split(",")]
+        perms[target_id] = [p.strip().lower() for p in perms_str.split(",") if p.strip()]
+        
     save_reseller_perms(perms)
     await update.message.reply_text(f"✅ Permissions updated for reseller {target_id}.\nAllowed: {perms[target_id]}")
 
