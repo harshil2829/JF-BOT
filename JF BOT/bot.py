@@ -3294,6 +3294,8 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def ensure_default_products():
     try:
         products = load_web_products()
+        if products: # If products already exist in DB, do not re-add deleted ones
+            return
         display_map = {
             "hxn": "HXN CHEAT",
             "lk": "LK TEAM",
