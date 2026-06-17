@@ -1291,9 +1291,15 @@ async def check_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📦 <b>Stock is empty!</b>", parse_mode="HTML")
         return
 
+    products = load_products()
+    active_keys = {p.get("key", "").lower() for p in products}
+
     stock_text = "📦 <b>CURRENT STOCK:</b>\n━━━━━━━━━━━━━━\n"
     for prod_dur, klist in keys.items():
-        stock_text += f"┠ <b>{prod_dur.upper()}:</b> {len(klist)} keys\n"
+        parts = prod_dur.split("_")
+        prod_prefix = parts[0].lower()
+        if prod_prefix in active_keys:
+            stock_text += f"┠ <b>{prod_dur.upper()}:</b> {len(klist)} keys\n"
     
     await update.message.reply_text(stock_text, parse_mode="HTML")
 
@@ -2741,9 +2747,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_stock":
         keys = load_keys()
+        products = load_products()
+        active_keys = {p.get("key", "").lower() for p in products}
         text = "📦 <b>CURRENT STOCK</b>\n━━━━━━━━━━━━━━━━━━\n"
         for k, v in keys.items():
-            if len(v) > 0:
+            parts = k.split("_")
+            prod_prefix = parts[0].lower()
+            if prod_prefix in active_keys and len(v) > 0:
                 text += f"• {k.upper()}: {len(v)} keys\n"
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_listresellers":

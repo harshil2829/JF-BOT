@@ -1016,9 +1016,15 @@ async def check_stock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📦 <b>Stock is empty!</b>", parse_mode="HTML")
         return
 
+    web_products = load_web_products()
+    active_names = {wp.get("name", "").lower() for wp in web_products}
+
     stock_text = "📦 <b>CURRENT STOCK:</b>\n━━━━━━━━━━━━━━\n"
     for prod_dur, klist in keys.items():
-        stock_text += f"┠ <b>{prod_dur.upper()}:</b> {len(klist)} keys\n"
+        parts = prod_dur.split("_")
+        prod_prefix = parts[0].lower()
+        if prod_prefix in active_names:
+            stock_text += f"┠ <b>{prod_dur.upper()}:</b> {len(klist)} keys\n"
     
     await update.message.reply_text(stock_text, parse_mode="HTML")
 
@@ -1877,9 +1883,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_stock":
         keys = load_keys()
+        web_products = load_web_products()
+        active_names = {wp.get("name", "").lower() for wp in web_products}
         text = "📦 <b>CURRENT STOCK</b>\n━━━━━━━━━━━━━━━━━━\n"
         for k, v in keys.items():
-            text += f"• {k.upper()}: {len(v)} keys\n"
+            parts = k.split("_")
+            prod_prefix = parts[0].lower()
+            if prod_prefix in active_names and len(v) > 0:
+                text += f"• {k.upper()}: {len(v)} keys\n"
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_listresellers":
         resellers = load_resellers()
