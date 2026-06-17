@@ -2846,9 +2846,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"✅ <b>PRODUCT ADDED SUCCESSFULLY!</b>\n━━━━━━━━━━━━━━━━━━\n"
             f"📦 <b>Name:</b> {prod_name.upper()}\n"
+            f"🔑 <b>Short Name (Key) for Resellers:</b> <code>{prod_name.lower()}</code>\n"
             f"📁 <b>Section:</b> {section_val}\n"
             f"💰 <b>Default Prices:</b> 1d: 50, 7d: 200, 15d: 400, 30d: 600\n"
-            f"📈 <b>Stock Initialized:</b> empty keys added to database\n"
+            f"📈 <b>Stock Initialized:</b> empty keys added to database\n\n"
+            f"💡 <i>Give this short name to resellers. They can generate keys using:</i>\n"
+            f"<code>/gen {prod_name.lower()} [1d/7d/15d/30d]</code>\n"
             "━━━━━━━━━━━━━━━━━━",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"

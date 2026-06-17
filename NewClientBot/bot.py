@@ -551,21 +551,22 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ Product with key <code>{prod_key}</code> already exists. Enter another name or cancel:")
             return
             
-        products.append({"key": prod_key, "name": prod_name})
-        settings["products"] = products
-        save_settings(settings)
-        
-        # Initialize keys stock in DB
-        keys = load_keys()
-        for dur in ["1d", "3d", "7d", "15d", "30d", "trial"]:
-            dict_key = f"{prod_key}_{dur}"
-            if dict_key not in keys:
-                keys[dict_key] = []
-        save_keys(keys)
-        
+        context.user_data["new_product_name"] = prod_name
+        context.user_data["new_product_key"] = prod_key
         context.user_data["state"] = None
-        kb = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
-        await update.message.reply_text(f"✅ Product <b>{prod_name}</b> (<code>{prod_key}</code>) has been added successfully!", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        
+        keyboard = [
+            [InlineKeyboardButton("Trial Only", callback_data="admin_add_product_sec_trial")],
+            [InlineKeyboardButton("Selling Only", callback_data="admin_add_product_sec_selling")],
+            [InlineKeyboardButton("Both", callback_data="admin_add_product_sec_both")],
+            [InlineKeyboardButton("« Cancel", callback_data="admin_prod_mgmt")]
+        ]
+        await update.message.reply_text(
+            f"🛒 <b>Product:</b> {prod_name.upper()}\n\n"
+            "Select which section this product belongs to:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
         return
 
     if state == "awaiting_manual_upi":
@@ -873,13 +874,15 @@ def get_main_menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_shop_keyboard(user_id=None):
-    keyboard = [
-        [InlineKeyboardButton("🛒 ALPHA-X STORE", callback_data="product_alphax")],
-        [InlineKeyboardButton("🛒 LK TEAM", callback_data="product_lkteam")],
-        [InlineKeyboardButton("🛒 BR MODS", callback_data="product_brmods")],
-        [InlineKeyboardButton("🛒 HEX BLADE", callback_data="product_hexblade")],
-        [InlineKeyboardButton("« Back", callback_data="main_menu")]
-    ]
+    products = load_products()
+    keyboard = []
+    for p in products:
+        sec = p.get("section", "Both")
+        if sec in ["Selling Only", "Both"]:
+            name = p.get("name", "").upper()
+            cb = f"product_{p.get('key', '').lower()}"
+            keyboard.append([InlineKeyboardButton(f"🛒 {name}", callback_data=cb)])
+    keyboard.append([InlineKeyboardButton("« Back", callback_data="main_menu")])
     return InlineKeyboardMarkup(keyboard)
 
 # --- ADMIN COMMANDS ---
@@ -1439,7 +1442,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         products = load_products()
         keyboard = []
         for p in products:
-            keyboard.append([InlineKeyboardButton(f"🎁 {p['name']}", callback_data=f"claim_trial_{p['key']}")])
+            sec = p.get("section", "Both")
+            if sec in ["Trial Only", "Both"]:
+                keyboard.append([InlineKeyboardButton(f"🎁 {p['name']}", callback_data=f"claim_trial_{p['key']}")])
         keyboard.append([InlineKeyboardButton("« Back", callback_data="main_menu")])
         await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         return
@@ -2501,15 +2506,63 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(buttons[i:i+2])
         keyboard.append([InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")])
         await query.edit_message_text("🗑️ <b>Select a product to remove:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_add_product_sec_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        section_type = data.split("_")[4]
+        prod_name = context.user_data.get("new_product_name")
+        prod_key = context.user_data.get("new_product_key")
+        if not prod_name or not prod_key:
+            await query.answer("❌ Session expired. Please try again.", show_alert=True)
+            return
+        sec_map = {
+            "trial": "Trial Only",
+            "selling": "Selling Only",
+            "both": "Both"
+        }
+        section_val = sec_map.get(section_type, "Both")
+        products = load_products()
+        products.append({"key": prod_key, "name": prod_name, "section": section_val})
+        settings["products"] = products
+        save_settings(settings)
+        
+        # Initialize keys stock in DB
+        keys = load_keys()
+        for dur in ["1d", "3d", "7d", "15d", "30d", "trial"]:
+            dict_key = f"{prod_key}_{dur}"
+            if dict_key not in keys:
+                keys[dict_key] = []
+        save_keys(keys)
+        
+        context.user_data["new_product_name"] = None
+        context.user_data["new_product_key"] = None
+        
+        kb = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(
+            f"✅ <b>PRODUCT ADDED SUCCESSFULLY!</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Name:</b> {prod_name.upper()}\n"
+            f"🔑 <b>Short Name (Key) for Resellers:</b> <code>{prod_key}</code>\n"
+            f"📁 <b>Section:</b> {section_val}\n"
+            f"📈 <b>Stock Initialized:</b> empty keys added to database\n\n"
+            f"💡 <i>Give this short name to resellers. They can generate keys using:</i>\n"
+            f"<code>/gen {prod_key} [1d/3d/7d/15d/30d]</code>\n"
+            "━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="HTML"
+        )
     elif data.startswith("admin_rmsel_"):
         if update.effective_user.id not in settings["admin_ids"]: return
         prod_key = "_".join(data.split("_")[2:])
         keyboard = [
-            [InlineKeyboardButton("✅ Yes, Delete", callback_data=f"admin_rmact_{prod_key}_both")],
+            [InlineKeyboardButton("Remove from Trial Only", callback_data=f"admin_rmact_{prod_key}_trial")],
+            [InlineKeyboardButton("Remove from Selling Only", callback_data=f"admin_rmact_{prod_key}_selling")],
+            [InlineKeyboardButton("Remove Completely (With Stock)", callback_data=f"admin_rmact_{prod_key}_both")],
             [InlineKeyboardButton("« Back", callback_data="admin_remove_product_start")]
         ]
         await query.edit_message_text(
-            f"❓ <b>Are you sure you want to completely delete {prod_key.upper()} and all its stock keys?</b>",
+            f"❓ <b>How do you want to remove {prod_key.upper()}?</b>\n\n"
+            "• <b>Trial Only:</b> Remove from Trial menu but keep in Selling menu.\n"
+            "• <b>Selling Only:</b> Remove from Shop/Selling menu but keep in Trial menu.\n"
+            "• <b>Remove Completely:</b> Fully delete the product and clear all stock keys from database.",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
@@ -2520,19 +2573,55 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         action = parts[-1]
         
         products = load_products()
-        new_products = [p for p in products if p.get("key", "").lower() != prod_key.lower()]
-        settings["products"] = new_products
+        updated_products = []
+        removed_completely = False
+        section_changed_to = None
+        
+        for p in products:
+            if p.get("key", "").lower() == prod_key.lower():
+                current_sec = p.get("section", "Both")
+                if action == "trial":
+                    if current_sec == "Both":
+                        p["section"] = "Selling Only"
+                        section_changed_to = "Selling Only"
+                        updated_products.append(p)
+                    elif current_sec == "Trial Only":
+                        removed_completely = True
+                    else:
+                        updated_products.append(p)
+                elif action == "selling":
+                    if current_sec == "Both":
+                        p["section"] = "Trial Only"
+                        section_changed_to = "Trial Only"
+                        updated_products.append(p)
+                    elif current_sec == "Selling Only":
+                        removed_completely = True
+                    else:
+                        updated_products.append(p)
+                elif action == "both":
+                    removed_completely = True
+            else:
+                updated_products.append(p)
+                
+        settings["products"] = updated_products
         save_settings(settings)
         
-        # Clear keys from database
-        keys = load_keys()
-        to_delete = [k for k in keys if k.startswith(f"{prod_key}_") or k == prod_key]
-        for k in to_delete:
-            keys.pop(k, None)
-        save_keys(keys)
-        
+        if removed_completely:
+            # Clear keys from database
+            keys = load_keys()
+            to_delete = [k for k in keys if k.startswith(f"{prod_key}_") or k == prod_key]
+            for k in to_delete:
+                keys.pop(k, None)
+            save_keys(keys)
+            msg_text = f"✅ <b>{prod_key.upper()}</b> has been completely removed along with all its stock keys."
+        else:
+            if section_changed_to:
+                msg_text = f"✅ <b>{prod_key.upper()}</b> section has been updated to <b>{section_changed_to}</b>."
+            else:
+                msg_text = f"✅ No changes were needed for <b>{prod_key.upper()}</b>."
+                
         kb = [[InlineKeyboardButton("« Back to Product Management", callback_data="admin_prod_mgmt")]]
-        await query.edit_message_text(f"✅ <b>{prod_key.upper()}</b> has been completely removed along with all its stock keys.", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        await query.edit_message_text(msg_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
         
     elif data == "admin_channel_setup_placeholder":
         if update.effective_user.id not in settings["admin_ids"]: return
