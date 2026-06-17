@@ -2720,9 +2720,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("➕ Add Product", callback_data="admin_add_product_start")],
             [InlineKeyboardButton("⚙️ Manage Products", callback_data="admin_manage_list")],
+            [InlineKeyboardButton("📋 View Short Names", callback_data="admin_view_short_names")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         await query.edit_message_text("📦 <b>Product Management Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_view_short_names":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        web_products = load_web_products()
+        if not web_products:
+            kb = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No products found.", reply_markup=InlineKeyboardMarkup(kb))
+            return
+        
+        text = "📋 <b>PRODUCT SHORT NAMES</b>\n━━━━━━━━━━━━━━━━━━\n"
+        for wp in web_products:
+            name = wp.get("display_name") or wp.get("name", "").upper()
+            short_name = wp.get("name", "").lower()
+            section = wp.get("section", "Both")
+            text += f"• <b>{name}</b>\n  └ Short Name: <code>{short_name}</code> ({section})\n"
+        
+        text += (
+            "\n💡 <i>Give this short name to resellers. Resellers can generate keys using:</i>\n"
+            "<code>/gen [short_name] [duration]</code>"
+        )
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_manage_list":
         if update.effective_user.id not in settings["admin_ids"]: return
         web_products = load_web_products()

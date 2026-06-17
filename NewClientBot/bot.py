@@ -2481,9 +2481,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("➕ Add Product", callback_data="admin_add_product_start")],
             [InlineKeyboardButton("➖ Remove Product", callback_data="admin_remove_product_start")],
+            [InlineKeyboardButton("📋 View Short Names", callback_data="admin_view_short_names")],
             [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
         ]
         await query.edit_message_text("📦 <b>Product Management Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_view_short_names":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        products = load_products()
+        if not products:
+            kb = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+            await query.edit_message_text("❌ No products found.", reply_markup=InlineKeyboardMarkup(kb))
+            return
+        
+        text = "📋 <b>PRODUCT SHORT NAMES</b>\n━━━━━━━━━━━━━━━━━━\n"
+        for p in products:
+            name = p.get("name", "").upper()
+            short_name = p.get("key", "").lower()
+            section = p.get("section", "Both")
+            text += f"• <b>{name}</b>\n  └ Short Name: <code>{short_name}</code> ({section})\n"
+        
+        text += (
+            "\n💡 <i>Give this short name to resellers. Resellers can generate keys using:</i>\n"
+            "<code>/gen [short_name] [duration]</code>"
+        )
+        kb = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_add_product_start":
         if update.effective_user.id not in settings["admin_ids"]: return
         context.user_data["state"] = "awaiting_new_product_name"
