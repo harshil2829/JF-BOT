@@ -1989,9 +1989,10 @@ async def reset_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def ensure_default_products():
     try:
-        products = load_web_products()
-        if products: # If products already exist in DB, do not re-add deleted ones
+        doc = jf_col.find_one({"_id": "web_products"})
+        if doc is not None: # If document exists (even if empty list), do not overwrite/restore
             return
+        products = []
         display_map = {
             "hxn": "HXN CHEAT",
             "lk": "LK TEAM",
