@@ -783,8 +783,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = [
                     [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
                     [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
-                    [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-                    [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+                    [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Reseller Actions", callback_data="admin_logsmode")],
+                    [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
+                    [InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
                     [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
                     [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
                 ]
@@ -913,8 +914,9 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
         [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
-        [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-        [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+        [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Reseller Actions", callback_data="admin_logsmode")],
+        [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
+        [InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
         [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
         [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
     ]
@@ -2359,8 +2361,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
             [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
-            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Reseller Actions", callback_data="admin_logsmode")],
+            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
+            [InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
             [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
             [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
         ]
@@ -2384,8 +2387,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("👑 Admins", callback_data="admin_help_commands")],
             [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"), InlineKeyboardButton(f"🤖 Bot: {status_emoji}", callback_data="toggle_bot_status")],
-            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Admin Actions", callback_data="admin_logsmode")],
-            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt"), InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
+            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📝 Recent Reseller Actions", callback_data="admin_logsmode")],
+            [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
+            [InlineKeyboardButton("🔎 Channel Setup", callback_data="admin_channel_setup_placeholder")],
             [InlineKeyboardButton("Set Minimum Refer", callback_data="admin_set_min_refer")],
             [InlineKeyboardButton("💸 Deposit", callback_data="admin_deposit_menu")]
         ]
