@@ -256,7 +256,34 @@ DEFAULT_SETTINGS = {
 
 def is_banned(user_id):
     trials = load_trials()
-    return trials.get(str(user_id), {}).get("banned", False)
+    user_data = trials.get(str(user_id))
+    if isinstance(user_data, dict):
+        return user_data.get("banned", False)
+    return False
+
+async def ban_user_from_channels(user_id: int, bot):
+    settings = load_settings()
+    channels = settings.get("force_channels", [])
+    if not channels and settings.get("force_channel"):
+        channels = [{"id": settings["force_channel"]}]
+    for ch in channels:
+        try:
+            await bot.ban_chat_member(chat_id=ch["id"], user_id=user_id)
+            logger.info(f"Banned user {user_id} from channel {ch['id']}")
+        except Exception as e:
+            logger.error(f"Failed to ban user {user_id} from channel {ch['id']}: {e}")
+
+async def unban_user_from_channels(user_id: int, bot):
+    settings = load_settings()
+    channels = settings.get("force_channels", [])
+    if not channels and settings.get("force_channel"):
+        channels = [{"id": settings["force_channel"]}]
+    for ch in channels:
+        try:
+            await bot.unban_chat_member(chat_id=ch["id"], user_id=user_id, only_if_banned=True)
+            logger.info(f"Unbanned user {user_id} from channel {ch['id']}")
+        except Exception as e:
+            logger.error(f"Failed to unban user {user_id} from channel {ch['id']}: {e}")
 
 async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = update.chat_member
@@ -266,9 +293,14 @@ async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE)
         trials = load_trials()
         if user_id not in trials:
             trials[user_id] = {"last_trial": 0, "strikes": 0, "banned": False}
-        trials[user_id]["strikes"] += 1
+        trials[user_id]["strikes"] = trials[user_id].get("strikes", 0) + 1
         if trials[user_id]["strikes"] >= 3:
             trials[user_id]["banned"] = True
+            try:
+                # Ban user from channels in background
+                asyncio.create_task(ban_user_from_channels(int(user_id), context.bot))
+            except Exception as e:
+                logger.error(f"Failed to initiate ban task: {e}")
         save_trials(trials)
 
 
@@ -1003,7 +1035,11 @@ async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trials[target_id] = {"last_trial": 0, "strikes": 0, "history": {}}
     trials[target_id]["banned"] = True
     save_trials(trials)
-    await update.message.reply_text(f"✅ User {target_id} has been BANNED.")
+    try:
+        await ban_user_from_channels(int(target_id), context.bot)
+    except Exception as e:
+        logger.error(f"Error banning user {target_id} from channels: {e}")
+    await update.message.reply_text(f"✅ User {target_id} has been BANNED from bot and channels.")
 
 async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
@@ -1018,6 +1054,10 @@ async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trials[target_id]["banned"] = False
         trials[target_id]["strikes"] = 0
         save_trials(trials)
+    try:
+        await unban_user_from_channels(int(target_id), context.bot)
+    except Exception as e:
+        logger.error(f"Error unbanning user {target_id} from channels: {e}")
     await update.message.reply_text(f"✅ User {target_id} has been UNBANNED and strikes reset to 0.")
 
 async def check_history_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2744,7 +2784,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif data == "admin_reset_trial_all":
-        save_trials({}) # Empty the trial dictionary
+        trials = load_trials()
+        for uid in list(trials.keys()):
+            if isinstance(trials[uid], dict):
+                trials[uid]["last_trial"] = 0
+                if "history" in trials[uid]:
+                    trials[uid]["history"] = {}
+        save_trials(trials)
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
         await query.edit_message_text("✅ All trial cooldowns have been reset! Every user can now claim another trial key.", reply_markup=InlineKeyboardMarkup(kb))
     elif data == "admin_trial_logs":
@@ -3097,7 +3143,40 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(help_text, parse_mode="HTML")
 
 async def run_bot():
+    # Re-ban all users who have 3+ strikes but are not currently banned
+    try:
+        trials = load_trials()
+        rebanned = 0
+        for uid, data in trials.items():
+            if isinstance(data, dict) and data.get("strikes", 0) >= 3 and not data.get("banned", False):
+                data["banned"] = True
+                rebanned += 1
+        if rebanned > 0:
+            save_trials(trials)
+            print(f"Startup reban: {rebanned} users re-banned in DB (had 3+ strikes but were not banned)")
+        banned_total = sum(1 for v in trials.values() if isinstance(v, dict) and v.get("banned", False))
+        print(f"Total banned users in DB: {banned_total}")
+    except Exception as e:
+        print(f"Error during startup reban: {e}")
+
     application = Application.builder().token(TOKEN).build()
+
+    # Sync bans with Telegram channels in the background
+    async def sync_telegram_bans():
+        await asyncio.sleep(5) # Wait for bot to be ready
+        try:
+            trials = load_trials()
+            banned_uids = [int(uid) for uid, data in trials.items() if isinstance(data, dict) and data.get("banned", False) and uid.isdigit()]
+            if banned_uids:
+                print(f"Syncing {len(banned_uids)} banned users with Telegram channels...")
+                for uid in banned_uids:
+                    await ban_user_from_channels(uid, application.bot)
+                    await asyncio.sleep(0.5) # Avoid Telegram rate limits
+                print("Telegram ban sync complete!")
+        except Exception as e:
+            print(f"Error during Telegram ban sync: {e}")
+            
+    asyncio.create_task(sync_telegram_bans())
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
@@ -3144,6 +3223,10 @@ async def run_bot():
     
     async def join_request_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
+            user_id = update.chat_join_request.from_user.id
+            if is_banned(user_id):
+                await update.chat_join_request.decline()
+                return
             await update.chat_join_request.approve()
         except:
             pass
