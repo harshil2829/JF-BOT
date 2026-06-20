@@ -1056,6 +1056,27 @@ async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         save_settings(settings)
         await update.message.reply_text(f"✅ Global Trial key cooldown has been set to {days} days.")
 
+async def set_wallet_limit_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]:
+        return
+        
+    if not context.args:
+        await update.message.reply_text("Usage: /set_wallet_limit [number]\nExample: /set_wallet_limit 3")
+        return
+        
+    try:
+        limit = int(context.args[0])
+        if limit < 1:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("Please provide a valid positive integer greater than 0.")
+        return
+        
+    settings["wallet_daily_limit"] = limit
+    save_settings(settings)
+    await update.message.reply_text(f"✅ Global Wallet purchase limit has been set to {limit} keys per day.")
+
 async def set_user_wallet_limit_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     if update.effective_user.id not in settings["admin_ids"]:
