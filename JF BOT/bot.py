@@ -292,60 +292,11 @@ logger = logging.getLogger(__name__)
 TOKEN = "7994962595:AAGOZdezJAetEVJPCpbOVqAds7AYaypWlRY"
 UPI_GATEWAY_TOKEN = "7994962595:AAGOZdezJAetEVJPCpbOVqAds7AYaypWlRY" 
 IS_AUTO_MODE = False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Default settings if file is missing
 DEFAULT_SETTINGS = {
     "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
     "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
 }
-
-
-
-
-
-
-
-
-
 
 def is_banned(user_id):
     trials = load_trials()
@@ -1104,6 +1055,31 @@ async def set_trial_days_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         settings["trial_cooldowns"]["default"] = days
         save_settings(settings)
         await update.message.reply_text(f"✅ Global Trial key cooldown has been set to {days} days.")
+
+async def set_user_wallet_limit_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings["admin_ids"]:
+        return
+        
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /set_user_wallet_limit [user_id] [number]\nExample: /set_user_wallet_limit 12345678 3")
+        return
+        
+    target_id = context.args[0]
+    try:
+        limit = int(context.args[1])
+        if limit < 1:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("Please provide a valid positive integer greater than 0.")
+        return
+        
+    if "user_wallet_limits" not in settings:
+        settings["user_wallet_limits"] = {}
+        
+    settings["user_wallet_limits"][target_id] = limit
+    save_settings(settings)
+    await update.message.reply_text(f"✅ Wallet purchase limit for user {target_id} has been set to {limit} keys per day.")
 
 async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
@@ -2360,11 +2336,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from datetime import datetime
             today_str = datetime.now().strftime("%Y-%m-%d")
             wp = load_wallet_purchases()
-            already_bought_today = (wp.get(user_id_str, "") == today_str)
+            
+            user_wp = wp.get(user_id_str, {})
+            purchases_today = 0
+            if isinstance(user_wp, str):
+                if user_wp == today_str:
+                    purchases_today = 1
+            else:
+                if user_wp.get("date") == today_str:
+                    purchases_today = user_wp.get("count", 0)
+                    
+            global_limit = int(settings.get("wallet_daily_limit", 1))
+            wallet_limit = int(settings.get("user_wallet_limits", {}).get(user_id_str, global_limit))
+            already_bought_today = (purchases_today >= wallet_limit)
             
             if not is_admin and (wallet_locked or product_locked or already_bought_today) and not is_reseller:
                 title = "❌ <b>WALLET PURCHASE DISABLED</b>"
-                reason_msg = "⚠️ <i>You have already purchased 1 key today using Wallet balance. Please pay using the QR code below for additional purchases.</i>" if already_bought_today else "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>"
+                reason_msg = f"⚠️ <i>You have already reached the limit of {wallet_limit} key(s) today using Wallet balance. Please pay using the QR code below for additional purchases.</i>" if already_bought_today else "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>"
                 full_payment_text = (
                     "<b>Status:</b> <code>Wallet Disabled</code>\n"
                     "━━━━━━━━━━━━━━━━━━\n"
@@ -2480,10 +2468,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from datetime import datetime
             today_str = datetime.now().strftime("%Y-%m-%d")
             wp = load_wallet_purchases()
-            already_bought_today = (wp.get(user_id_str, "") == today_str)
+            
+            user_wp = wp.get(user_id_str, {})
+            purchases_today = 0
+            if isinstance(user_wp, str):
+                if user_wp == today_str:
+                    purchases_today = 1
+            else:
+                if user_wp.get("date") == today_str:
+                    purchases_today = user_wp.get("count", 0)
+                    
+            global_limit = int(settings.get("wallet_daily_limit", 1))
+            wallet_limit = int(settings.get("user_wallet_limits", {}).get(user_id_str, global_limit))
+            already_bought_today = (purchases_today >= wallet_limit)
             is_admin = query.from_user.id in settings.get("admin_ids", [])
             if not is_admin and (wallet_locked or product_locked or already_bought_today) and not is_reseller:
-                await query.answer("🚫 You have already purchased 1 key today using Wallet balance.", show_alert=True)
+                await query.answer(f"🚫 You have already reached the limit of {wallet_limit} key(s) today using Wallet balance.", show_alert=True)
                 return
             order_id = data.split("_")[1]
             if context.user_data.get(f"processed_{order_id}"):
@@ -2525,7 +2525,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # Save wallet purchase today
                     today_str = datetime.now().strftime("%Y-%m-%d")
                     wp = load_wallet_purchases()
-                    wp[user_id_str] = today_str
+                    
+                    user_wp = wp.get(user_id_str, {})
+                    if isinstance(user_wp, str):
+                        if user_wp == today_str:
+                            user_wp = {"date": today_str, "count": 1}
+                        else:
+                            user_wp = {"date": today_str, "count": 0}
+                    else:
+                        if user_wp.get("date") != today_str:
+                            user_wp = {"date": today_str, "count": 0}
+                            
+                    user_wp["count"] = user_wp.get("count", 0) + 1
+                    wp[user_id_str] = user_wp
                     save_wallet_purchases(wp)
 
                     resellers_check = load_resellers()
@@ -3540,6 +3552,8 @@ async def run_bot():
     application.add_handler(CommandHandler("unlock_trial", unlock_trial_cmd))
     application.add_handler(CommandHandler("lock_wallet", lock_wallet_cmd))
     application.add_handler(CommandHandler("unlock_wallet", unlock_wallet_cmd))
+    application.add_handler(CommandHandler("set_wallet_limit", set_wallet_limit_cmd))
+    application.add_handler(CommandHandler("set_user_wallet_limit", set_user_wallet_limit_cmd))
     
     application.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.FORWARDED, message_handler))
