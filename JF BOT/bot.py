@@ -903,38 +903,8 @@ def get_main_menu_keyboard():
 
 def get_shop_keyboard(user_id=None):
     web_products = load_web_products()
-    if not web_products:
-        all_buttons = [
-            InlineKeyboardButton("HXN CHEAT", callback_data="product_hxn"),
-            InlineKeyboardButton("LK TEAM", callback_data="product_lk"),
-            InlineKeyboardButton("HEX BLADE", callback_data="product_hex"),
-            InlineKeyboardButton("ALPHA-X STORE", callback_data="product_alpha"),
-            InlineKeyboardButton("PRIME X CHEAT", callback_data="product_prime"),
-            InlineKeyboardButton("HARSHIL MODS", callback_data="product_harshil"),
-            InlineKeyboardButton("TRINITY X ROOT", callback_data="product_trinity"),
-            InlineKeyboardButton("FLUORITE ANDROID", callback_data="product_fluorite"),
-            InlineKeyboardButton("SVJ CHEATS", callback_data="product_svj"),
-            InlineKeyboardButton("BR MODS", callback_data="product_brmods"),
-            InlineKeyboardButton("BEYOND CHEATS", callback_data="product_beyond"),
-            InlineKeyboardButton("ROGERIO MODS", callback_data="product_rogerio"),
-            InlineKeyboardButton("HAWK CHEATS", callback_data="product_hawk"),
-            InlineKeyboardButton("RAPID CORE", callback_data="product_rapid"),
-            InlineKeyboardButton("DAEMON PHONK", callback_data="product_daemon"),
-            InlineKeyboardButton("HXN STREAMER (.SH)", callback_data="product_streamerxsh"),
-            InlineKeyboardButton("BS SECURE LOADER", callback_data="product_bssecure"),
-            InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="product_hydra"),
-            InlineKeyboardButton("XTFFH4X STREAMER", callback_data="product_xtffh4x_streamer"),
-            InlineKeyboardButton("STREAMER X", callback_data="product_streamerx"),
-            InlineKeyboardButton("BOOYAH PANEL", callback_data="product_boyyah"),
-            InlineKeyboardButton("ELITE TEAM", callback_data="product_eliteteam"),
-            InlineKeyboardButton("NGO TRAN", callback_data="product_ngo"),
-            InlineKeyboardButton("GREED PANEL", callback_data="product_greed"),
-            InlineKeyboardButton("LK TEAM PRO", callback_data="product_lkpro"),
-            InlineKeyboardButton("KIWMODZ EXE", callback_data="product_kiwmodz"),
-            InlineKeyboardButton("XYZ SUPREME", callback_data="product_xyz")
-        ]
-    else:
-        all_buttons = []
+    all_buttons = []
+    if web_products:
         for wp in web_products:
             section = wp.get("section", "Both")
             if section in ["Selling Only", "Both", "selling", "both"]:
@@ -1741,27 +1711,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
         web_products = load_web_products()
-        if not web_products:
-            keyboard = [
-                [InlineKeyboardButton("HXN CHEAT", callback_data="claim_trial_hxn"), InlineKeyboardButton("LK TEAM", callback_data="claim_trial_lk")],
-                [InlineKeyboardButton("HEX BLADE", callback_data="claim_trial_hex"), InlineKeyboardButton("ALPHA-X-STORE", callback_data="claim_trial_alpha")],
-                [InlineKeyboardButton("BR MODS", callback_data="claim_trial_brmods"), InlineKeyboardButton("XTFFH4X STREAMER", callback_data="claim_trial_xtffh4x")],
-                [InlineKeyboardButton("HOT STREAMER", callback_data="claim_trial_hotstreamer"), InlineKeyboardButton("STREAMER X", callback_data="claim_trial_streamerx")],
-                [InlineKeyboardButton("BOOYAH PANEL", callback_data="claim_trial_boyyah"), InlineKeyboardButton("ELITE TEAM", callback_data="claim_trial_eliteteam")],
-                [InlineKeyboardButton("NGO TRAN", callback_data="claim_trial_ngo"), InlineKeyboardButton("GREED PANEL", callback_data="claim_trial_greed")],
-                [InlineKeyboardButton("LK TEAM PRO", callback_data="claim_trial_lkpro"), InlineKeyboardButton("KIWMODZ EXE", callback_data="claim_trial_kiwmodz")],
-                [InlineKeyboardButton("XYZ SUPREME", callback_data="claim_trial_xyz"), InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
-            ]
-            await query.edit_message_text("🎁 <b>TRIAL KEYS</b>\n\nSelect a product to get a 1-Day Trial Key.\n⚠️ <i>You can only claim ONE trial key every 24 hours. Leaving the channel to cheat will result in a PERMANENT BAN.</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-            return
-
         all_buttons = []
-        for wp in web_products:
-            section = wp.get("section", "Both")
-            if section in ["Trial Only", "Both", "trial", "both"]:
-                name = (wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")) + " TRIAL"
-                callback = f"claim_trial_{wp.get('name', '').lower()}"
-                all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
+        if web_products:
+            for wp in web_products:
+                section = wp.get("section", "Both")
+                if section in ["Trial Only", "Both", "trial", "both"]:
+                    name = (wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")) + " TRIAL"
+                    callback = f"claim_trial_{wp.get('name', '').lower()}"
+                    all_buttons.append(InlineKeyboardButton(name, callback_data=callback))
                 
         keyboard = []
         for i in range(0, len(all_buttons), 2):
@@ -1878,27 +1835,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "admin_add_keys":
         if update.effective_user.id not in settings["admin_ids"]: return
         web_products = load_web_products()
-        if not web_products:
-            keyboard = [
-                [InlineKeyboardButton("HXN", callback_data="bulk_prod_hxn"), InlineKeyboardButton("LK", callback_data="bulk_prod_lk")],
-                [InlineKeyboardButton("HEX", callback_data="bulk_prod_hex"), InlineKeyboardButton("ALPHA", callback_data="bulk_prod_alpha")],
-                [InlineKeyboardButton("PRIME", callback_data="bulk_prod_prime"), InlineKeyboardButton("HARSHIL", callback_data="bulk_prod_harshil")],
-                [InlineKeyboardButton("TRINITY X", callback_data="bulk_prod_trinity"), InlineKeyboardButton("FLUORITE", callback_data="bulk_prod_fluorite")],
-                [InlineKeyboardButton("SVJ", callback_data="bulk_prod_svj"), InlineKeyboardButton("BR MODS", callback_data="bulk_prod_brmods")],
-                [InlineKeyboardButton("BEYOND", callback_data="bulk_prod_beyond"), InlineKeyboardButton("ROGERIO", callback_data="bulk_prod_rogerio")],
-                [InlineKeyboardButton("HAWK", callback_data="bulk_prod_hwak"), InlineKeyboardButton("RAPID CORE", callback_data="bulk_prod_rapid")],
-                [InlineKeyboardButton("DAEMON PHONK", callback_data="bulk_prod_daemon"), InlineKeyboardButton("HXN STREAMER", callback_data="bulk_prod_streamerxsh")],
-                [InlineKeyboardButton("BS SECURE LOADER", callback_data="bulk_prod_bssecure"), InlineKeyboardButton("HYDRA ENGINE 8BP", callback_data="bulk_prod_hydra")],
-                [InlineKeyboardButton("XTFFH4X STREAMER", callback_data="bulk_prod_xtffh4x_streamer")],
-                [InlineKeyboardButton("STREAMER X", callback_data="bulk_prod_streamerx"), InlineKeyboardButton("BOOYAH PANEL", callback_data="bulk_prod_boyyah")],
-                [InlineKeyboardButton("ELITE TEAM", callback_data="bulk_prod_eliteteam"), InlineKeyboardButton("NGO TRAN", callback_data="bulk_prod_ngo")],
-                [InlineKeyboardButton("GREED PANEL", callback_data="bulk_prod_greed"), InlineKeyboardButton("LK TEAM PRO", callback_data="bulk_prod_lkpro")],
-                [InlineKeyboardButton("KIWMODZ EXE", callback_data="bulk_prod_kiwmodz"), InlineKeyboardButton("XYZ SUPREME", callback_data="bulk_prod_xyz")],
-                [InlineKeyboardButton("« Back to Admin Panel", callback_data="admin_panel_cb")]
-            ]
-            context.user_data["state"] = "awaiting_bulk_product"
-            await query.edit_message_text("🛒 <b>Select Product to Add Keys:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-            return
 
         all_buttons = []
         for wp in web_products:
