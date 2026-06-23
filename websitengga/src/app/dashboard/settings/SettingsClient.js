@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Key, Gift, Users, Crown, Settings2, Globe, Wrench, Save } from 'lucide-react';
-import { saveSettings } from '../actions';
+import { saveSettings } from '../../actions';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsClient({ initialSettings }) {

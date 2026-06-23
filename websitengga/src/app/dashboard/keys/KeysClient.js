@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Search, Key, Plus, Trash2, X } from 'lucide-react';
-import { addKeys } from '../actions';
+import { addKeys } from '../../actions';
 import { useRouter } from 'next/navigation';
 
 function KeyModal({ isOpen, onClose, onSave, productsList }) {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Package, Plus, Edit2, Trash2, X } from 'lucide-react';
-import { addProduct, deleteProduct, editProduct } from '../actions';
+import { addProduct, deleteProduct, editProduct } from '../../actions';
 import { useRouter } from 'next/navigation';
 
 function ProductModal({ isOpen, onClose, onSave, editData }) {

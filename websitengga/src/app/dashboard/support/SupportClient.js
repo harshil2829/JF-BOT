@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Plus, Users, User, MessageCircle, Clock, Search, Download, X } from 'lucide-react';
-import { addStaff } from '../actions';
+import { addStaff } from '../../actions';
 import { useRouter } from 'next/navigation';
 
 function StaffModal({ isOpen, onClose, onSave }) {

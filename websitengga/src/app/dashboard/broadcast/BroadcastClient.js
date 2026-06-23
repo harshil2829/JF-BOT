@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { RefreshCw, Users, Send, Eye, User, Crown } from 'lucide-react';
-import { sendBroadcast } from '../actions';
+import { sendBroadcast } from '../../actions';
 import { useRouter } from 'next/navigation';
 
 export default function BroadcastClient({ totalUsers, logs: initialLogs }) {
