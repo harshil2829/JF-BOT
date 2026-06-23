@@ -16,28 +16,28 @@ export default function Sidebar() {
         <h2 style={{ fontSize: '18px', margin: 0, fontWeight: 700 }}>Quantum Bot <span style={{display: 'block', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400}}>Admin Panel</span></h2>
       </div>
 
-      <Link href="/" className={`menu-item ${pathname === '/' ? 'active' : ''}`}>
+      <Link href="/dashboard" className={`menu-item ${pathname === '/dashboard' ? 'active' : ''}`}>
         <LayoutDashboard size={18} /> Dashboard
       </Link>
-      <Link href="/keys" className={`menu-item ${pathname === '/keys' ? 'active' : ''}`}>
+      <Link href="/dashboard/keys" className={`menu-item ${pathname === '/dashboard/keys' ? 'active' : ''}`}>
         <Key size={18} /> Key Management
       </Link>
-      <Link href="/users" className={`menu-item ${pathname === '/users' ? 'active' : ''}`}>
+      <Link href="/dashboard/users" className={`menu-item ${pathname === '/dashboard/users' ? 'active' : ''}`}>
         <Users size={18} /> User Management
       </Link>
-      <Link href="/products" className={`menu-item ${pathname === '/products' ? 'active' : ''}`}>
+      <Link href="/dashboard/products" className={`menu-item ${pathname === '/dashboard/products' ? 'active' : ''}`}>
         <Database size={18} /> Product Management
       </Link>
-      <Link href="/broadcast" className={`menu-item ${pathname === '/broadcast' ? 'active' : ''}`}>
+      <Link href="/dashboard/broadcast" className={`menu-item ${pathname === '/dashboard/broadcast' ? 'active' : ''}`}>
         <Megaphone size={18} /> Broadcast
       </Link>
-      <Link href="/settings" className={`menu-item ${pathname === '/settings' ? 'active' : ''}`}>
+      <Link href="/dashboard/settings" className={`menu-item ${pathname === '/dashboard/settings' ? 'active' : ''}`}>
         <Settings size={18} /> Settings
       </Link>
-      <Link href="/support" className={`menu-item ${pathname === '/support' ? 'active' : ''}`}>
+      <Link href="/dashboard/support" className={`menu-item ${pathname === '/dashboard/support' ? 'active' : ''}`}>
         <HeadphonesIcon size={18} /> Staff & Support
       </Link>
-      <Link href="/admin" className={`menu-item ${pathname === '/admin' ? 'active' : ''}`}>
+      <Link href="/dashboard/admin" className={`menu-item ${pathname === '/dashboard/admin' ? 'active' : ''}`}>
         <ShieldCheck size={18} /> Admin Management
       </Link>
     </div>
