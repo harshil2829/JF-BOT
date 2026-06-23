@@ -2774,10 +2774,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("➕ Add Reseller", callback_data="admin_guide_add"), InlineKeyboardButton("➖ Remove Reseller", callback_data="admin_guide_remove")],
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
-            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
+            [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("💸 Remove Balance", callback_data="admin_remove_bal")],
             [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
             [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
             [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
+            [InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
             [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
         ]
         await query.edit_message_text("👑 <b>Admin Dashboard</b>\nSelect an option below:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -3068,6 +3069,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To remove a VIP reseller, type:\n<code>/remove_reseller [user_id]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_guide_bal":
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]; await query.edit_message_text("To add wallet balance, type:\n<code>/add_balance [user_id] [amount]</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    elif data == "admin_remove_bal":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        keyboard = [
+            [InlineKeyboardButton("👤 Particular User", callback_data="admin_rmbal_user")],
+            [InlineKeyboardButton("👥 All Users", callback_data="admin_rmbal_all")],
+            [InlineKeyboardButton("👑 All Resellers", callback_data="admin_rmbal_resellers")],
+            [InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]
+        ]
+        await query.edit_message_text("💸 <b>Remove Balance</b>\nSelect whose balance you want to clear/remove:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data.startswith("admin_rmbal_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        parts = data.split("_")
+        action = parts[2]
+        
+        if action == "user":
+            kb = [[InlineKeyboardButton("« Back", callback_data="admin_remove_bal")]]
+            await query.edit_message_text("To remove balance from a specific user, type:\n<code>/remove_balance [user_id] [amount]</code>\n\nTo completely clear their balance, type:\n<code>/remove_balance [user_id] 999999</code>", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        elif action == "all":
+            kb = [
+                [InlineKeyboardButton("⚠️ YES, CLEAR ALL USERS", callback_data="admin_rmbal_confirm_all")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="admin_remove_bal")]
+            ]
+            await query.edit_message_text("⚠️ <b>WARNING</b> ⚠️\nAre you sure you want to clear the balance of <b>ALL USERS</b> (set to 0)?", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        elif action == "resellers":
+            kb = [
+                [InlineKeyboardButton("⚠️ YES, CLEAR ALL RESELLERS", callback_data="admin_rmbal_confirm_resellers")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="admin_remove_bal")]
+            ]
+            await query.edit_message_text("⚠️ <b>WARNING</b> ⚠️\nAre you sure you want to clear the balance of <b>ALL RESELLERS</b> (set to 0)?", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+        elif action == "confirm":
+            target = parts[3]
+            balances = load_balances()
+            cleared_count = 0
+            if target == "all":
+                for uid in list(balances.keys()):
+                    if balances[uid] > 0:
+                        balances[uid] = 0.0
+                        cleared_count += 1
+            elif target == "resellers":
+                resellers = load_resellers()
+                for uid in list(balances.keys()):
+                    if uid in resellers and balances[uid] > 0:
+                        balances[uid] = 0.0
+                        cleared_count += 1
+            save_balances(balances)
+            kb = [[InlineKeyboardButton("« Back", callback_data="admin_remove_bal")]]
+            await query.edit_message_text(f"✅ Successfully cleared balance for {cleared_count} accounts.", reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
     elif data == "admin_reset_trial":
         kb = [
             [InlineKeyboardButton("Reset ALL Users", callback_data="admin_reset_trial_all")],
