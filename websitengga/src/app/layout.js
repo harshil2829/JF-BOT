@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Quantum Panel",
+  title: "JF HACKS Panel",
   description: "Enterprise License Infrastructure",
 };
 
