@@ -240,6 +240,37 @@ def log_reseller_action(username, user_id, product, key):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Default settings if file is missing
 DEFAULT_SETTINGS = {
     "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
@@ -254,36 +285,10 @@ DEFAULT_SETTINGS = {
 
 
 
+
 def is_banned(user_id):
     trials = load_trials()
-    user_data = trials.get(str(user_id))
-    if isinstance(user_data, dict):
-        return user_data.get("banned", False)
-    return False
-
-async def ban_user_from_channels(user_id: int, bot):
-    settings = load_settings()
-    channels = settings.get("force_channels", [])
-    if not channels and settings.get("force_channel"):
-        channels = [{"id": settings["force_channel"]}]
-    for ch in channels:
-        try:
-            await bot.ban_chat_member(chat_id=ch["id"], user_id=user_id)
-            logger.info(f"Banned user {user_id} from channel {ch['id']}")
-        except Exception as e:
-            logger.error(f"Failed to ban user {user_id} from channel {ch['id']}: {e}")
-
-async def unban_user_from_channels(user_id: int, bot):
-    settings = load_settings()
-    channels = settings.get("force_channels", [])
-    if not channels and settings.get("force_channel"):
-        channels = [{"id": settings["force_channel"]}]
-    for ch in channels:
-        try:
-            await bot.unban_chat_member(chat_id=ch["id"], user_id=user_id, only_if_banned=True)
-            logger.info(f"Unbanned user {user_id} from channel {ch['id']}")
-        except Exception as e:
-            logger.error(f"Failed to unban user {user_id} from channel {ch['id']}: {e}")
+    return trials.get(str(user_id), {}).get("banned", False)
 
 async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = update.chat_member
@@ -293,15 +298,19 @@ async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE)
         trials = load_trials()
         if user_id not in trials:
             trials[user_id] = {"last_trial": 0, "strikes": 0, "banned": False}
-        trials[user_id]["strikes"] = trials[user_id].get("strikes", 0) + 1
+        trials[user_id]["strikes"] += 1
         if trials[user_id]["strikes"] >= 3:
             trials[user_id]["banned"] = True
-            try:
-                # Ban user from channels in background
-                asyncio.create_task(ban_user_from_channels(int(user_id), context.bot))
-            except Exception as e:
-                logger.error(f"Failed to initiate ban task: {e}")
         save_trials(trials)
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1035,11 +1044,7 @@ async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trials[target_id] = {"last_trial": 0, "strikes": 0, "history": {}}
     trials[target_id]["banned"] = True
     save_trials(trials)
-    try:
-        await ban_user_from_channels(int(target_id), context.bot)
-    except Exception as e:
-        logger.error(f"Error banning user {target_id} from channels: {e}")
-    await update.message.reply_text(f"✅ User {target_id} has been BANNED from bot and channels.")
+    await update.message.reply_text(f"✅ User {target_id} has been BANNED.")
 
 async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
@@ -1054,10 +1059,6 @@ async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         trials[target_id]["banned"] = False
         trials[target_id]["strikes"] = 0
         save_trials(trials)
-    try:
-        await unban_user_from_channels(int(target_id), context.bot)
-    except Exception as e:
-        logger.error(f"Error unbanning user {target_id} from channels: {e}")
     await update.message.reply_text(f"✅ User {target_id} has been UNBANNED and strikes reset to 0.")
 
 async def check_history_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1471,9 +1472,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     data = query.data
     settings = load_settings()
-    if settings.get("bot_status", "on") == "off" and update.effective_user.id not in settings.get("admin_ids", []):
-        await query.answer("⚠️ Bot is currently offline.", show_alert=True)
-        return
+    
 
     if is_banned(update.effective_user.id):
         await query.answer("🚫 You are banned.", show_alert=True)
@@ -1593,7 +1592,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
             
-            await query.edit_message_text(f"✅ <b>TRIAL KEY GENERATED</b>\n━━━━━━━━━━━━━━━━━━\n🏺 <b>Product:</b> {product.upper()}\n🔑 <b>Key:</b> <code>{delivered_key}</code>\n\n<i>Enjoy your trial! Do not leave the channel, or you will be banned.</i>\n\nhttps://t.me/JFFREEAPK\njoin this for apk", parse_mode="HTML")
+            await query.edit_message_text(f"✅ <b>TRIAL KEY GENERATED</b>\n━━━━━━━━━━━━━━━━━━\n🏺 <b>Product:</b> {product.upper()}\n🔑 <b>Key:</b> <code>{delivered_key}</code>\n\n<i>Enjoy your trial! Do not leave the channel, or you will be banned.</i>\n\nhttps://t.me/akashprime_filestore_update\njoin this for apk", parse_mode="HTML")
         else:
             keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
             await query.edit_message_text(f"❌ <b>OUT OF STOCK</b>\n━━━━━━━━━━━━━━\nNo trial keys available for {product.upper()} right now.\n\nPlease ask the Admin to restock them.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -1715,21 +1714,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         
         settings = load_settings()
+        admin_messages = {}
+        msg = (
+            "💰 <b>NEW BALANCE REQUEST</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>User:</b> {username} (<code>{user_id}</code>)\n"
+            f"💵 <b>Amount:</b> ${amount:.2f}\n"
+            f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+            "<i>Please verify the payment and add balance.</i>"
+        )
         for admin_id in settings.get("admin_ids", []):
             try:
-                msg = (
-                    "💰 <b>NEW BALANCE REQUEST</b>\n"
-                    "━━━━━━━━━━━━━━━━━━\n"
-                    f"👤 <b>User:</b> {username} (<code>{user_id}</code>)\n"
-                    f"💵 <b>Amount:</b> ${amount:.2f}\n"
-                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-                    "<i>Please verify the payment and add balance.</i>"
-                )
-                kb = [[InlineKeyboardButton("✅ Approve", callback_data=f"balapp_{user_id}_{amount}"), InlineKeyboardButton("❌ Reject", callback_data=f"balrej_{user_id}")]]
-                await context.bot.send_message(chat_id=admin_id, text=msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                kb = [[InlineKeyboardButton("✅ Approve", callback_data=f"balapp_{user_id}_{amount}_{order_id}"), InlineKeyboardButton("❌ Reject", callback_data=f"balrej_{user_id}_{order_id}")]]
+                sent_msg = await context.bot.send_message(chat_id=admin_id, text=msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+                admin_messages[str(admin_id)] = sent_msg.message_id
             except:
                 pass
                 
+        save_order_messages(order_id, {"status": "pending", "messages": admin_messages, "text": msg, "is_photo": False})
+        
         await query.edit_message_caption(caption="✅ <b>Request Sent!</b>\n━━━━━━━━━━━━━━━━━━\nThe admin has been notified. Your balance will be added once the payment is verified.", parse_mode="HTML") if query.message.photo else await query.edit_message_text(text="✅ <b>Request Sent!</b>\n━━━━━━━━━━━━━━━━━━\nThe admin has been notified. Your balance will be added once the payment is verified.", parse_mode="HTML")
 
     elif data.startswith("balapp_"):
@@ -1737,6 +1740,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         user_id = parts[1]
         amount = float(parts[2])
+        order_id = parts[3] if len(parts) > 3 else "Unknown"
+        
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+            
+        order_data["status"] = "approved"
+        save_order_messages(order_id, order_data)
         
         balances = load_balances()
         balances[user_id] = balances.get(user_id, 0.0) + amount
@@ -1747,16 +1764,64 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
             
-        await query.edit_message_text(query.message.text + f"\n\n✅ <b>APPROVED</b>\nAdded ${amount:.2f} to {user_id}", parse_mode="HTML")
+        for admin_id, msg_id in order_data.get("messages", {}).items():
+            try:
+                orig_text = order_data.get("text", "")
+                update_text = (
+                    f"\n\n✅ <b>APPROVED</b>\n"
+                    f"👤 <b>Approved by:</b> {query.from_user.first_name}\n"
+                    f"💰 Added ${amount:.2f} to {user_id}"
+                )
+                await context.bot.edit_message_text(
+                    chat_id=int(admin_id),
+                    message_id=msg_id,
+                    text=orig_text + update_text,
+                    reply_markup=None,
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"Error updating admin message {admin_id}: {e}")
         
     elif data.startswith("balrej_"):
         if update.effective_user.id not in settings.get("admin_ids", []): return
-        user_id = data.split("_")[1]
+        parts = data.split("_")
+        user_id = parts[1]
+        order_id = parts[2] if len(parts) > 2 else "Unknown"
+        
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+            
+        order_data["status"] = "rejected"
+        save_order_messages(order_id, order_data)
+        
         try:
             await context.bot.send_message(chat_id=user_id, text="❌ <b>BALANCE REQUEST REJECTED</b>\n━━━━━━━━━━━━━━━━━━\nYour payment could not be verified. Please contact support.", parse_mode="HTML")
         except:
             pass
-        await query.edit_message_text(query.message.text + "\n\n❌ <b>REJECTED</b>", parse_mode="HTML")
+            
+        for admin_id, msg_id in order_data.get("messages", {}).items():
+            try:
+                orig_text = order_data.get("text", "")
+                update_text = (
+                    f"\n\n❌ <b>REJECTED</b>\n"
+                    f"👤 <b>Rejected by:</b> {query.from_user.first_name}"
+                )
+                await context.bot.edit_message_text(
+                    chat_id=int(admin_id),
+                    message_id=msg_id,
+                    text=orig_text + update_text,
+                    reply_markup=None,
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"Error updating admin message {admin_id}: {e}")
     elif data.startswith("pay_"):
         parts = data.split("_")
         method = parts[1]
@@ -1853,7 +1918,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             context.user_data["state"] = "awaiting_receipt"
             context.user_data["order_id"] = order_id
-            context.user_data["method"] = "upi"
             
             try:
                 await query.message.delete()
@@ -2203,7 +2267,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         "━━━━━━━━━━━━━━━━━━\n"
                         f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                         "<i>Thank you for shopping with us!</i>\n\n"
-                        "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
+                        "📱 <b>Get the APK here:</b> https://t.me/akashprime_filestore_update"
                     )
                     debug_log("Editing success msg")
                     await query.edit_message_text(text=success_msg, parse_mode="HTML")
@@ -2265,6 +2329,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             duration_label = context.user_data.get("duration", "1d")
         
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=query.message.caption + status_text, reply_markup=None, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+
         # 1. GENERATE OR FETCH KEY
         auto_products = []
         
@@ -2280,6 +2357,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 delivered_key = None
         
         if delivered_key:
+            order_data["status"] = "approved"
+            save_order_messages(order_id, order_data)
+            
             resellers_check = load_resellers()
             target_str = str(target_user_id)
             if target_str in resellers_check:
@@ -2297,23 +2377,44 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                 "<i>Thank you for shopping with us!</i>\n\n"
-                "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
+                "📱 <b>Get the APK here:</b> https://t.me/akashprime_filestore_update"
             )
             try:
                 await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
-                
-                # Update Admin Message
-                update_text = (
-                    f"✅ <b>APPROVED & KEY SENT</b>\n"
-                    f"🔑 <b>Generated:</b> <code>{delivered_key}</code>"
-                )
-                if query.message.photo:
-                    await query.edit_message_caption(caption=query.message.caption + f"\n\n{update_text}", parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=query.message.text + f"\n\n{update_text}", parse_mode="HTML")
             except Exception as e:
-                await query.answer(f"Error sending key: {e}", show_alert=True)
+                logger.error(f"Error sending key to user: {e}")
+                
+            for admin_id, msg_id in order_data.get("messages", {}).items():
+                try:
+                    orig_text = order_data.get("text", "")
+                    update_text = (
+                        f"\n\n✅ <b>APPROVED & KEY SENT</b>\n"
+                        f"👤 <b>Approved by:</b> {query.from_user.first_name}\n"
+                        f"🔑 <b>Generated:</b> <code>{delivered_key}</code>"
+                    )
+                    if order_data.get("is_photo", False):
+                        await context.bot.edit_message_caption(
+                            chat_id=int(admin_id),
+                            message_id=msg_id,
+                            caption=orig_text + update_text,
+                            reply_markup=None,
+                            parse_mode="HTML"
+                        )
+                    else:
+                        await context.bot.edit_message_text(
+                            chat_id=int(admin_id),
+                            message_id=msg_id,
+                            text=orig_text + update_text,
+                            reply_markup=None,
+                            parse_mode="HTML"
+                        )
+                except Exception as e:
+                    logger.error(f"Error updating admin message {admin_id}: {e}")
         else:
+            order_data["status"] = "approved"
+            save_order_messages(order_id, order_data)
+            
+            # Send Out of Stock notification to user
             success_msg = (
                 "✅ <b>PAYMENT VERIFIED!</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
@@ -2323,30 +2424,92 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━\n"
                 "⚠️ <b>We are currently out of stock for this key!</b>\n"
                 "The admin will send your key manually very soon. Thank you for your patience!\n\n"
-                "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
+                "📱 <b>Get the APK here:</b> https://t.me/akashprime_filestore_update"
             )
             try:
                 await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
-                
-                # Update Admin Message
-                update_text = (
-                    f"✅ <b>APPROVED (OUT OF STOCK)</b>\n"
-                    f"⚠️ <i>Please deliver the key manually to user: <code>{target_user_id}</code></i>"
-                )
-                if query.message.photo:
-                    await query.edit_message_caption(caption=query.message.caption + f"\n\n{update_text}", parse_mode="HTML")
-                else:
-                    await query.edit_message_text(text=query.message.text + f"\n\n{update_text}", parse_mode="HTML")
             except Exception as e:
-                await query.answer(f"Error sending notification: {e}", show_alert=True)
+                logger.error(f"Error sending out of stock message to user: {e}")
+                
+            for admin_id, msg_id in order_data.get("messages", {}).items():
+                try:
+                    orig_text = order_data.get("text", "")
+                    update_text = (
+                        f"\n\n✅ <b>APPROVED (OUT OF STOCK)</b>\n"
+                        f"👤 <b>Approved by:</b> {query.from_user.first_name}\n"
+                        f"⚠️ <i>Please deliver the key manually to user: <code>{target_user_id}</code></i>"
+                    )
+                    if order_data.get("is_photo", False):
+                        await context.bot.edit_message_caption(
+                            chat_id=int(admin_id),
+                            message_id=msg_id,
+                            caption=orig_text + update_text,
+                            reply_markup=None,
+                            parse_mode="HTML"
+                        )
+                    else:
+                        await context.bot.edit_message_text(
+                            chat_id=int(admin_id),
+                            message_id=msg_id,
+                            text=orig_text + update_text,
+                            reply_markup=None,
+                            parse_mode="HTML"
+                        )
+                except Exception as e:
+                    logger.error(f"Error updating admin message {admin_id}: {e}")
+            await query.answer("✅ Approved (Out of Stock, user notified for manual delivery).", show_alert=True)
 
     elif data.startswith("reject_"):
-        target_user_id = int(data.split("_")[1])
+        parts = data.split("_")
+        target_user_id = int(parts[1])
+        order_id = parts[2] if len(parts) > 2 else "Unknown"
+        
+        order_data = load_order_messages(order_id)
+        if order_data.get("status", "pending") != "pending":
+            await query.answer(f"⚠️ Already {order_data['status'].upper()} by another admin!", show_alert=True)
+            status_text = f"\n\n⚠️ <b>ALREADY {order_data['status'].upper()}</b>"
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=query.message.caption + status_text, reply_markup=None, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=query.message.text + status_text, reply_markup=None, parse_mode="HTML")
+            except:
+                pass
+            return
+            
+        order_data["status"] = "rejected"
+        save_order_messages(order_id, order_data)
+        
         try:
             await context.bot.send_message(chat_id=target_user_id, text="❌ <b>Payment Rejected!</b>\nYour payment could not be verified. Please contact support if you think this is a mistake.", parse_mode="HTML")
-            await query.edit_message_caption(caption=query.message.caption + "\n\n❌ <b>REJECTED</b>") if query.message.photo else await query.edit_message_text(text=query.message.text + "\n\n❌ <b>REJECTED</b>")
         except Exception as e:
-            await query.answer(f"Error notifying user: {e}", show_alert=True)
+            logger.error(f"Error notifying user: {e}")
+            
+        for admin_id, msg_id in order_data.get("messages", {}).items():
+            try:
+                orig_text = order_data.get("text", "")
+                update_text = (
+                    f"\n\n❌ <b>REJECTED</b>\n"
+                    f"👤 <b>Rejected by:</b> {query.from_user.first_name}"
+                )
+                if order_data.get("is_photo", False):
+                    await context.bot.edit_message_caption(
+                        chat_id=int(admin_id),
+                        message_id=msg_id,
+                        caption=orig_text + update_text,
+                        reply_markup=None,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await context.bot.edit_message_text(
+                        chat_id=int(admin_id),
+                        message_id=msg_id,
+                        text=orig_text + update_text,
+                        reply_markup=None,
+                        parse_mode="HTML"
+                    )
+            except Exception as e:
+                logger.error(f"Error updating admin message {admin_id}: {e}")
     elif data.startswith("refresh_"):
         order_id = data.split("_")[1]
         amount = context.user_data.get("amount", "0")
@@ -2570,7 +2733,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"• <b>{name}</b>\n  └ Short Name: <code>{short_name}</code> ({section})\n"
         
         text += (
-            "\n💡 <i>Give this short name to resellers. Resellers can generate keys using:</i>\n"
+            "\n💡 <i>Give these short names to resellers. Resellers can generate keys using:</i>\n"
             "<code>/gen [short_name] [duration]</code>"
         )
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_prod_mgmt")]]
@@ -2784,13 +2947,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     elif data == "admin_reset_trial_all":
-        trials = load_trials()
-        for uid in list(trials.keys()):
-            if isinstance(trials[uid], dict):
-                trials[uid]["last_trial"] = 0
-                if "history" in trials[uid]:
-                    trials[uid]["history"] = {}
-        save_trials(trials)
+        save_trials({}) # Empty the trial dictionary
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
         await query.edit_message_text("✅ All trial cooldowns have been reset! Every user can now claim another trial key.", reply_markup=InlineKeyboardMarkup(kb))
     elif data == "admin_trial_logs":
@@ -3138,45 +3295,12 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "━━━━━━━━━━━━━━━━━━\n"
             "Use the menu buttons below to navigate the shop.\n\n"
             "👤 <b>Support:</b> @ahmedakash007\n"
-            "📢 <b>Join Channel:</b> https://t.me/JFFREEAPK"
+            "📢 <b>Join Channel:</b> https://t.me/akashprime_filestore_update"
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
 
 async def run_bot():
-    # Re-ban all users who have 3+ strikes but are not currently banned
-    try:
-        trials = load_trials()
-        rebanned = 0
-        for uid, data in trials.items():
-            if isinstance(data, dict) and data.get("strikes", 0) >= 3 and not data.get("banned", False):
-                data["banned"] = True
-                rebanned += 1
-        if rebanned > 0:
-            save_trials(trials)
-            print(f"Startup reban: {rebanned} users re-banned in DB (had 3+ strikes but were not banned)")
-        banned_total = sum(1 for v in trials.values() if isinstance(v, dict) and v.get("banned", False))
-        print(f"Total banned users in DB: {banned_total}")
-    except Exception as e:
-        print(f"Error during startup reban: {e}")
-
     application = Application.builder().token(TOKEN).build()
-
-    # Sync bans with Telegram channels in the background
-    async def sync_telegram_bans():
-        await asyncio.sleep(5) # Wait for bot to be ready
-        try:
-            trials = load_trials()
-            banned_uids = [int(uid) for uid, data in trials.items() if isinstance(data, dict) and data.get("banned", False) and uid.isdigit()]
-            if banned_uids:
-                print(f"Syncing {len(banned_uids)} banned users with Telegram channels...")
-                for uid in banned_uids:
-                    await ban_user_from_channels(uid, application.bot)
-                    await asyncio.sleep(0.5) # Avoid Telegram rate limits
-                print("Telegram ban sync complete!")
-        except Exception as e:
-            print(f"Error during Telegram ban sync: {e}")
-            
-    asyncio.create_task(sync_telegram_bans())
 
     # Handlers
     application.add_handler(CommandHandler("start", start))
@@ -3223,10 +3347,6 @@ async def run_bot():
     
     async def join_request_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
-            user_id = update.chat_join_request.from_user.id
-            if is_banned(user_id):
-                await update.chat_join_request.decline()
-                return
             await update.chat_join_request.approve()
         except:
             pass
