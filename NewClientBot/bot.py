@@ -13,7 +13,7 @@ import random
 import string
 import time
 import datetime
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler, ChatMemberHandler, ChatJoinRequestHandler
 import httpx
 
@@ -867,6 +867,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<b>{user.first_name}</b>\nContact\n\n✅ <b>IDENTITY VERIFIED</b>\n"
         "━━━━━━━━━━━━━━\n"
         "Your account is now fully active.",
+        reply_markup=ReplyKeyboardRemove(),
         parse_mode="HTML"
     )
     
