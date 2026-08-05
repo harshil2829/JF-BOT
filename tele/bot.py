@@ -82,8 +82,15 @@ def log_activity(user_id, action):
     if len(logs) > 50: logs = logs[-50:]
     jf_col.update_one({"_id": "bot_activity_logs"}, {"$set": {"data": logs}}, upsert=True)
 
+DEFAULT_SETTINGS = {
+    "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
+    "admin_ids": []
+}
+
 def load_settings():
-    settings = get_cached("settings", {"admin_ids": [12345678]})
+    loaded = get_cached("settings", {})
+    settings = DEFAULT_SETTINGS.copy()
+    settings.update(loaded)
     web_staff = load_web_staff()
     staff_ids = [int(s.get("telegram_id")) for s in web_staff if s.get("telegram_id") and str(s.get("telegram_id")).isdigit()]
     admin_ids = settings.get("admin_ids", [])
@@ -288,15 +295,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# CONFIGURATION
-TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs"
-UPI_GATEWAY_TOKEN = "8351306541:AAENmDtxkiRiFud2T2YJLGCI9KT5V3tilVs" 
-IS_AUTO_MODE = False
-# Default settings if file is missing
-DEFAULT_SETTINGS = {
-    "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
-    "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
-}
+
 
 def is_banned(user_id):
     trials = load_trials()
