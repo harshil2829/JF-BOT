@@ -7,6 +7,13 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmgg
 client = MongoClient(MONGO_URI, connectTimeoutMS=5000, socketTimeoutMS=5000, maxIdleTimeMS=30000, retryWrites=True)
 db = client['TelegramBotDB']
 tele_col = db['tele_data']
+jf_col = db['jf_data']
+
+# Default settings if file/DB is missing
+DEFAULT_SETTINGS = {
+    "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
+    "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
+}
 
 import time
 _CACHE = {}
@@ -31,7 +38,7 @@ def set_cached(key, data):
     tele_col.update_one({"_id": key}, {"$set": {"data": data}}, upsert=True)
 
 def load_settings():
-    return get_cached("settings", {"admin_ids": [12345678]})
+    return get_cached("settings", DEFAULT_SETTINGS)
 
 def save_settings(settings):
     set_cached("settings", settings)
@@ -82,14 +89,13 @@ def save_resellers(resellers):
     set_cached("resellers", resellers)
 
 def load_reseller_logs():
-    return get_cached("reseller_logs", [])
+    return get_cached("reseller_logs", {})
 
-def save_reseller_logs(user_id, product, key):
+def log_reseller_action(user_id, product, duration_label):
     logs = load_reseller_logs()
-    from datetime import datetime
-    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logs.append(f"{time_str} - User {user_id} generated {product} key: {key}")
-    if len(logs) > 50: logs = logs[-50:]
+    user_id = str(user_id)
+    if user_id not in logs: logs[user_id] = []
+    logs[user_id].append({"time": time.time(), "product": product, "duration": duration_label})
     set_cached("reseller_logs", logs)
 
 def load_web_products():
@@ -146,121 +152,7 @@ UPI_GATEWAY_TOKEN = "0443e894-ef49-4f38-866d-e55fcab6408f"
 IS_AUTO_MODE = False
 
 
-# Default settings if file is missing
-DEFAULT_SETTINGS = {
-    "welcome_text": "\n<b>━━━━━━━━━━━━━━━━━━</b>\n✨ <b>WELCOME TO OUR STORE</b> ✨\n👋 <b>Hello, {name}!</b>\n<b>━━━━━━━━━━━━━━━━━━</b>\n\n🛍️ <b>Store:</b> Buy premium services. Instant Delivery !!\n👤 <b>Profile:</b> Your Account Details.\n💰 <b>Deposit:</b> Add Funds to Wallet.\n📋 <b>History:</b> Track your Orders.\n🎁 <b>Referral:</b> Earn by inviting Friends.\n🎬 <b>How to Use:</b> How to buy Key\n📞 <b>Help:</b> Get Support from Owner.\n🎰 <b>Lucky Spin:</b> Win Exciting Prizes\n",
-    "admin_ids": [] # Add your Telegram User ID here (e.g., [12345678])
-}
 
-def load_settings(): 
-    if not os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE, "w") as f:
-            json.dump(DEFAULT_SETTINGS, f, indent=4)
-        return DEFAULT_SETTINGS
-    with open(SETTINGS_FILE, "r") as f:
-        return json.load(f)
-
-def save_settings(settings):
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f, indent=4)
-
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return []
-    with open(USERS_FILE, "r") as f:
-        try:
-            return json.load(f)
-        except:
-            return []
-
-def save_user(user_id):
-    users = load_users()
-    if user_id not in users:
-        users.append(user_id)
-        with open(USERS_FILE, "w") as f:
-            json.dump(users, f, indent=4)
-
-def load_verified_users():
-    if not os.path.exists(VERIFIED_USERS_FILE):
-        return []
-    with open(VERIFIED_USERS_FILE, "r") as f:
-        try:
-            return json.load(f)
-        except:
-            return []
-
-def save_verified_user(user_id):
-    verified = load_verified_users()
-    if user_id not in verified:
-        verified.append(user_id)
-        with open(VERIFIED_USERS_FILE, "w") as f:
-            json.dump(verified, f, indent=4)
-
-def load_keys():
-    if not os.path.exists(KEYS_FILE):
-        return {}
-    with open(KEYS_FILE, "r") as f:
-        try:
-            return json.load(f)
-        except:
-            return {}
-
-def save_keys(keys):
-    with open(KEYS_FILE, "w") as f:
-        json.dump(keys, f, indent=4)
-
-def load_utr_log():
-    if not os.path.exists(UTR_LOG_FILE):
-        return []
-    with open(UTR_LOG_FILE, "r") as f:
-        try:
-            return json.load(f)
-        except:
-            return []
-
-def load_balances():
-    if not os.path.exists(BALANCES_FILE):
-        return {}
-    with open(BALANCES_FILE, "r") as f:
-        try:
-            return json.load(f)
-        except:
-            return {}
-
-def save_balances(balances):
-    with open(BALANCES_FILE, "w") as f:
-        json.dump(balances, f, indent=4)
-
-def load_resellers():
-    if not os.path.exists(RESELLERS_FILE): return {}
-    with open(RESELLERS_FILE, "r") as f:
-        try: return json.load(f)
-        except: return {}
-
-def save_resellers(resellers):
-    with open(RESELLERS_FILE, "w") as f:
-        json.dump(resellers, f, indent=4)
-
-def load_reseller_logs():
-    if not os.path.exists(RESELLER_LOGS_FILE): return {}
-    with open(RESELLER_LOGS_FILE, "r") as f:
-        try: return json.load(f)
-        except: return {}
-
-def log_reseller_action(user_id, product, duration_label):
-    logs = load_reseller_logs()
-    user_id = str(user_id)
-    if user_id not in logs: logs[user_id] = []
-    logs[user_id].append({"time": time.time(), "product": product, "duration": duration_label})
-    with open(RESELLER_LOGS_FILE, "w") as f:
-        json.dump(logs, f, indent=4)
-
-def save_utr(utr):
-    log = load_utr_log()
-    if utr not in log:
-        log.append(utr)
-        with open(UTR_LOG_FILE, "w") as f:
-            json.dump(log, f, indent=4)
 
 ADMIN_MESSAGES_FILE = "admin_messages.json"
 
