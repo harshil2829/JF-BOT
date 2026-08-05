@@ -1698,7 +1698,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "trial_key":
         settings = load_settings()
         if settings.get("trial_locked", False):
-            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@JFHAXX01\n<b>OR DEVLOPER :-</b>@rajput_harshil")
+            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@rajput_harshil\n<b>OR DEVLOPER :-</b>@rajput_harshil")
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
@@ -1722,7 +1722,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("claim_trial_"):
         settings = load_settings()
         if settings.get("trial_locked", False):
-            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@JFHAXX01\n<b>OR DEVLOPER :-</b>@rajput_harshil")
+            msg = settings.get("trial_locked_msg", "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n<b>NO FEEDBACK AND SUPPORT KEY</b>\n<b>STOP ASK OWNER :-</b>@rajput_harshil\n<b>OR DEVLOPER :-</b>@rajput_harshil")
             kb = [[InlineKeyboardButton("« Back", callback_data="main_menu")]]
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
@@ -2144,7 +2144,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "3️⃣ <b>Pay:</b> Scan the QR code and pay.\n"
             "4️⃣ <b>Confirm:</b> Send the UTR/Screenshot.\n"
             "5️⃣ <b>Receive:</b> Get your key instantly!\n\n"
-            "📞 <b>Need help?</b> Contact @JFHAXX01",
+            "📞 <b>Need help?</b> Contact @rajput_harshil",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
             parse_mode="HTML"
         )
@@ -2153,7 +2153,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📞 <b>CONNECT HELPLINE</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "If you have any issues with payments or keys, contact our official support:\n\n"
-            "👤 <b>Support:</b> @JFHAXX01\n"
+            "👤 <b>Support:</b> @rajput_harshil\n"
             "⏰ <b>Active:</b> 10 AM - 10 PM",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
             parse_mode="HTML"
@@ -3294,7 +3294,7 @@ async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings["trial_locked_msg"] = (
             "🚫 <b>TRIAL SECTION LOCKED</b> 🚫\n\n"
             "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
-            "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
+            "<b>STOP ASK OWNER :-</b>@rajput_harshil\n"
             "<b>OR DEVLOPER :-</b>@rajput_harshil"
         )
         save_settings(settings)
@@ -3311,7 +3311,7 @@ async def lock_trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             custom_msg = (
                 f"🚫 <b>{first_arg.upper()} TRIAL LOCKED</b> 🚫\n\n"
                 "<b>NO FEEDBACK AND SUPPORT KEY</b>\n"
-                "<b>STOP ASK OWNER :-</b>@JFHAXX01\n"
+                "<b>STOP ASK OWNER :-</b>@rajput_harshil\n"
                 "<b>OR DEVLOPER :-</b>@rajput_harshil"
             )
             
@@ -3402,68 +3402,13 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "ℹ️ <b>STORE HELPLINE</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "Use the menu buttons below to navigate the shop.\n\n"
-            "👤 <b>Support:</b> @JFHAXX01\n"
+            "👤 <b>Support:</b> @rajput_harshil\n"
             "📢 <b>Join Channel:</b> https://t.me/JFFREEAPK"
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
 
 def ensure_default_products():
-    try:
-        doc = jf_col.find_one({"_id": "web_products"})
-        if doc is not None: # If document exists (even if empty list), do not overwrite/restore
-            return
-        products = []
-        display_map = {
-            "hxn": "HXN CHEAT",
-            "lk": "LK TEAM",
-            "hex": "HEX BLADE",
-            "alpha": "ALPHA-X-STORE",
-            "prime": "PRIME X CHEAT",
-            "harshil": "HARSHIL MODS",
-            "trinity": "TRINITY X ROOT",
-            "fluorite": "FLUORITE ANDROID",
-            "svj": "SVJ CHEATS",
-            "brmods": "BR MODS",
-            "beyond": "BEYOND CHEATS",
-            "rogerio": "ROGERIO MODS",
-            "hwak": "HAWK CHEATS",
-            "rapid": "RAPID CORE",
-            "daemon": "DAEMON PHONK",
-            "hxnstreamer": "HXN STREAMER (.SH)",
-            "bs": "BS SECURE LOADER",
-            "hydra": "HYDRA ENGINE 8BP",
-            "xtffh4x_streamer": "XTFFH4X STREAMER",
-            "streamerx": "STREAMER X",
-            "boyyah": "BOOYAH PANEL",
-            "eliteteam": "ELITE TEAM",
-            "ngo": "NGO TRAN",
-            "greed": "GREED PANEL",
-            "lkpro": "LK TEAM PRO",
-            "kiwmodz": "KIWMODZ EXE",
-            "xyz": "XYZ SUPREME"
-        }
-        changed = False
-        for wp in products:
-            pname = wp.get("name", "").lower()
-            if pname in display_map and not wp.get("display_name"):
-                wp["display_name"] = display_map[pname]
-                changed = True
-        existing_names = {wp.get("name", "").lower() for wp in products}
-        for name_id, display_name in display_map.items():
-            if name_id not in existing_names:
-                products.append({
-                    "name": name_id,
-                    "display_name": display_name,
-                    "prices": {"1d": 50, "7d": 200, "15d": 400, "30d": 600},
-                    "status": "Active",
-                    "section": "Both"
-                })
-                changed = True
-        if changed:
-            save_web_products(products)
-            print("Successfully populated missing default products into database.")
-    except Exception as e:
-        print(f"Error populating default products: {e}")
+    pass
 
 async def run_bot():
     # Re-ban all users who have 3+ strikes but are not currently banned
