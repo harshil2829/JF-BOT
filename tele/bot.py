@@ -269,14 +269,7 @@ def log_user_action(user_id, product, key):
 def log_reseller_action(username, user_id, product, key):
     save_reseller_logs(username, user_id, product, key)
 
-import os
 
-from pymongo import MongoClient
-
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://admin:28295609@cluster0.6kcmggh.mongodb.net/?appName=Cluster0")
-client = MongoClient(MONGO_URI)
-db = client['TelegramBotDB']
-jf_col = db['tele_data']
 
 import asyncio
 import json
