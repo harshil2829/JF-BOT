@@ -680,14 +680,23 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
         else:
             err_msg = result.get("message", "Reset failed. Please check the key and try again.")
-            await status_msg.edit_text(
-                f"❌ <b>HWID RESET FAILED</b>\n"
+            res_count = result.get("reset_count")
+            max_res = result.get("max_resets")
+            reseller = result.get("reseller")
+
+            msg = (
+                "❌ <b>HWID RESET FAILED</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"🔑 <b>Key:</b> <code>{raw_text}</code>\n"
                 f"💬 <b>Reason:</b> {err_msg}\n"
-                "━━━━━━━━━━━━━━━━━━",
-                parse_mode="HTML"
             )
+            if res_count is not None and max_res is not None:
+                msg += f"📊 <b>Resets Used:</b> {res_count} / {max_res}\n"
+            if reseller:
+                msg += f"👤 <b>Reseller:</b> {reseller}\n"
+            msg += "━━━━━━━━━━━━━━━━━━"
+
+            await status_msg.edit_text(msg, parse_mode="HTML")
         return
 
     if state == "awaiting_balance_amount":
