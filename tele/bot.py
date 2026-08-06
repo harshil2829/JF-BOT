@@ -493,6 +493,22 @@ async def generate_key_from_api(product, duration_label, product_id=None):
             
     return None
 
+async def reset_key_api(key: str):
+    """Calls the Alwaysdata API to reset HWID for a key."""
+    api_url = "https://harshilexe.alwaysdata.net/api/bot_reset_key.php"
+    master_secret = "harshil_master_hwid_reset_2026"
+    params = {
+        "master_secret": master_secret,
+        "key": key.strip()
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, params=params, timeout=15)
+            return response.json()
+        except Exception as e:
+            logger.error(f"Reset HWID API Error: {e}")
+            return {"status": False, "message": f"Connection error: {e}"}
+
 # --- HANDLERS ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -629,6 +645,51 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     
     
+    if state == "awaiting_reset_key":
+        raw_text = update.message.text.strip() if update.message and update.message.text else ""
+        if not raw_text or raw_text.startswith("/") or raw_text in ["👑 Admin Panel", "cancel"]:
+            context.user_data["state"] = None
+            return
+
+        context.user_data["state"] = None
+        status_msg = await update.message.reply_text("🔄 <b>Processing HWID reset request...</b>", parse_mode="HTML")
+        result = await reset_key_api(raw_text)
+
+        if result.get("status") is True:
+            res_count = result.get("reset_count", 1)
+            max_res = result.get("max_resets", 2)
+            rem_res = result.get("remaining_resets", 0)
+            reseller = result.get("reseller", "")
+
+            msg = (
+                "✅ <b>HWID RESET SUCCESSFUL!</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"🔑 <b>Key:</b> <code>{raw_text}</code>\n"
+                f"📊 <b>Resets Used:</b> {res_count} / {max_res}\n"
+                f"⏳ <b>Remaining Resets:</b> {rem_res}\n"
+            )
+            if reseller:
+                msg += f"👤 <b>Reseller:</b> {reseller}\n"
+            msg += "━━━━━━━━━━━━━━━━━━\n"
+            msg += "<i>Your key has been reset and can now be used on a new device!</i>"
+
+            await status_msg.edit_text(msg, parse_mode="HTML")
+            try:
+                log_activity(update.effective_user.id, f"reset HWID for key {raw_text}")
+            except:
+                pass
+        else:
+            err_msg = result.get("message", "Reset failed. Please check the key and try again.")
+            await status_msg.edit_text(
+                f"❌ <b>HWID RESET FAILED</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"🔑 <b>Key:</b> <code>{raw_text}</code>\n"
+                f"💬 <b>Reason:</b> {err_msg}\n"
+                "━━━━━━━━━━━━━━━━━━",
+                parse_mode="HTML"
+            )
+        return
+
     if state == "awaiting_balance_amount":
         if update.message.text in ["👑 Admin Panel", "/start", "/help", "cancel"]:
             context.user_data["state"] = None
@@ -889,7 +950,10 @@ def get_main_menu_keyboard():
             InlineKeyboardButton("🎬 How To Use Bot", callback_data="how_to_use"),
             InlineKeyboardButton("📞 Connect Helpline", callback_data="helpline")
         ],
-        [InlineKeyboardButton("🎁 Get Trial Key", callback_data="trial_key")]
+        [
+            InlineKeyboardButton("🎁 Get Trial Key", callback_data="trial_key"),
+            InlineKeyboardButton("🔄 Reset Key / HWID", callback_data="reset_hwid_start")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -2165,6 +2229,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Try your luck and win free keys or balance!\n\n"
             "⚠️ <i>Coming soon in the next update...</i>",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
+            parse_mode="HTML"
+        )
+    elif data == "reset_hwid_start":
+        context.user_data["state"] = "awaiting_reset_key"
+        keyboard = [[InlineKeyboardButton("« Back to Main Menu", callback_data="main_menu")]]
+        await query.edit_message_text(
+            "🔄 <b>RESET KEY / HWID</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "Please send the <b>License Key</b> you want to reset HWID for:\n"
+            "(e.g., <code>VIP-123456</code>)\n\n"
+            "⚠️ <i>Note: Each key can only be reset up to 2 times.</i>",
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
     elif data.startswith("product_"):
