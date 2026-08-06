@@ -699,6 +699,53 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_msg.edit_text(msg, parse_mode="HTML")
         return
 
+    if state == "awaiting_new_product_price":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        raw_text = update.message.text.strip() if update.message and update.message.text else ""
+        if not raw_text or raw_text.startswith("/") or raw_text in ["👑 Admin Panel", "cancel"]:
+            context.user_data["state"] = None
+            return
+
+        try:
+            new_price = float(raw_text)
+            if new_price < 0:
+                raise ValueError
+        except:
+            await update.message.reply_text("❌ Invalid price! Please enter a valid number (e.g. 70):")
+            return
+
+        prod_name = context.user_data.get("edit_price_product")
+        duration = context.user_data.get("edit_price_duration")
+        context.user_data["state"] = None
+
+        web_products = load_web_products()
+        changed = False
+        for wp in web_products:
+            if wp.get("name", "").lower() == prod_name.lower():
+                if "prices" not in wp or not isinstance(wp["prices"], dict):
+                    wp["prices"] = {"1d": 50, "7d": 200, "15d": 400, "30d": 600}
+                wp["prices"][duration] = int(new_price) if new_price.is_integer() else new_price
+                changed = True
+                break
+
+        if changed:
+            save_web_products(web_products)
+            duration_labels = {"1d": "1 Day", "7d": "7 Days", "15d": "15 Days", "30d": "30 Days"}
+            dur_label = duration_labels.get(duration, duration)
+            keyboard = [[InlineKeyboardButton("« Back to Product", callback_data=f"admin_prod_opt_{prod_name}")]]
+            await update.message.reply_text(
+                f"✅ <b>PRICE UPDATED SUCCESSFULLY!</b>\n━━━━━━━━━━━━━━━━━━\n"
+                f"📦 <b>Product:</b> {prod_name.upper()}\n"
+                f"⏳ <b>Duration:</b> {dur_label}\n"
+                f"💵 <b>New Price:</b> ₹{new_price:.2f}\n"
+                "━━━━━━━━━━━━━━━━━━",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text("❌ Product not found.")
+        return
+
     if state == "awaiting_balance_amount":
         if update.message.text in ["👑 Admin Panel", "/start", "/help", "cancel"]:
             context.user_data["state"] = None
@@ -2918,9 +2965,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         use_api = wp.get("use_api", False)
         section = wp.get("section", "Both")
         
+        prices = wp.get("prices", {"1d": 50, "7d": 200, "15d": 400, "30d": 600})
         status_text = "CONNECTED ✅ (Generates key from Alwaysdata API)" if use_api else "DISABLED ❌ (Uses local stock keys)"
         
         keyboard = [
+            [InlineKeyboardButton("💲 Edit Product Prices", callback_data=f"admin_prod_editprice_{prod_name}")],
             [InlineKeyboardButton("🔌 Toggle API Connection", callback_data=f"admin_prod_tglapi_{prod_name}")],
             [InlineKeyboardButton("🗑️ Remove / Delete Product", callback_data=f"admin_rmsel_{prod_name}")],
             [InlineKeyboardButton("« Back to List", callback_data="admin_manage_list")]
@@ -2930,8 +2979,62 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📦 <b>Name:</b> {wp.get('name', '')}\n"
             f"📁 <b>Section:</b> {section}\n"
             f"🔌 <b>Alwaysdata API:</b> {status_text}\n"
-            f"💡 <i>(Note: Alwaysdata API uses product_id = 1 for all queries)</i>\n"
+            f"💰 <b>Current Prices:</b>\n"
+            f"   • 1 Day: ₹{prices.get('1d', 50)}\n"
+            f"   • 7 Days: ₹{prices.get('7d', 200)}\n"
+            f"   • 15 Days: ₹{prices.get('15d', 400)}\n"
+            f"   • 30 Days: ₹{prices.get('30d', 600)}\n"
             "━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data.startswith("admin_prod_editprice_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        prod_name = "_".join(data.split("_")[3:])
+        web_products = load_web_products()
+        wp = next((p for p in web_products if p.get("name", "").lower() == prod_name.lower()), None)
+        if not wp:
+            await query.answer("❌ Product not found.", show_alert=True)
+            return
+        prices = wp.get("prices", {"1d": 50, "7d": 200, "15d": 400, "30d": 600})
+        display_name = wp.get("display_name") or wp.get("name", "").upper().replace("_", " ")
+
+        keyboard = [
+            [
+                InlineKeyboardButton(f"1 Day (₹{prices.get('1d', 50)})", callback_data=f"admin_setprice_{prod_name}_1d"),
+                InlineKeyboardButton(f"7 Days (₹{prices.get('7d', 200)})", callback_data=f"admin_setprice_{prod_name}_7d")
+            ],
+            [
+                InlineKeyboardButton(f"15 Days (₹{prices.get('15d', 400)})", callback_data=f"admin_setprice_{prod_name}_15d"),
+                InlineKeyboardButton(f"30 Days (₹{prices.get('30d', 600)})", callback_data=f"admin_setprice_{prod_name}_30d")
+            ],
+            [InlineKeyboardButton("« Back to Product", callback_data=f"admin_prod_opt_{prod_name}")]
+        ]
+        await query.edit_message_text(
+            f"💲 <b>EDIT PRICES: {display_name}</b>\n━━━━━━━━━━━━━━━━━━\n"
+            "Select which duration price you want to change:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    elif data.startswith("admin_setprice_"):
+        if update.effective_user.id not in settings["admin_ids"]: return
+        parts = data.split("_")
+        prod_name = "_".join(parts[2:-1])
+        duration = parts[-1]
+        
+        context.user_data["state"] = "awaiting_new_product_price"
+        context.user_data["edit_price_product"] = prod_name
+        context.user_data["edit_price_duration"] = duration
+
+        duration_labels = {"1d": "1 Day", "7d": "7 Days", "15d": "15 Days", "30d": "30 Days"}
+        dur_label = duration_labels.get(duration, duration)
+
+        keyboard = [[InlineKeyboardButton("« Cancel", callback_data=f"admin_prod_editprice_{prod_name}")]]
+        await query.edit_message_text(
+            f"✏️ <b>ENTER NEW PRICE</b>\n━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Product:</b> {prod_name.upper()}\n"
+            f"⏳ <b>Duration:</b> {dur_label}\n\n"
+            "Please send the new price in Rupees (e.g. <code>70</code>):",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
