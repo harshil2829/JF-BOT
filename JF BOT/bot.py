@@ -66,13 +66,15 @@ def save_web_products(products):
 def check_use_api(product):
     try:
         products = load_web_products()
+        prod_clean = product.lower().replace("✔️", "").strip()
         for p in products:
-            if p.get("name", "").lower() == product.lower():
+            p_name = p.get("name", "").lower().replace("✔️", "").strip()
+            if p_name == prod_clean or p_name.startswith(prod_clean) or prod_clean.startswith(p_name):
                 if p.get("use_api") is not None:
                     return p.get("use_api")
     except Exception as e:
         logger.error(f"Error checking check_use_api: {e}")
-    return product.lower() in ["hxn", "prime", "harshil", "hxnmodule"]
+    return True
 
 def log_activity(user_id, action):
     doc = jf_col.find_one({"_id": "bot_activity_logs"})
@@ -2308,11 +2310,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 prices = wp.get("prices", prices)
                 break
                 
+        use_api = check_use_api(product_key)
+        
         # Load stock (from keys)
         keys_data = load_keys()
         
         # Get stock length
         def get_stock(d_label):
+            if use_api:
+                return 999
             dict_key = f"{product_key}_{d_label}"
             return len(keys_data.get(dict_key, []))
             
@@ -2321,19 +2327,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         stock_15d = get_stock("15d")
         stock_30d = get_stock("30d")
         
+        def fmt_stk(stk):
+            if use_api:
+                return "⚡ Instant API Delivery", "✅ <b>Stock Available</b>"
+            if stk > 0:
+                return f"{stk} stock", "✅ <b>Stock Available</b>"
+            return "0 stock", "❌ <b>Out of Stock</b>"
+
+        s1_info, s1_status = fmt_stk(stock_1d)
+        s7_info, s7_status = fmt_stk(stock_7d)
+        s15_info, s15_status = fmt_stk(stock_15d)
+        s30_info, s30_status = fmt_stk(stock_30d)
+
         # Format the text dynamically
         price_text = (
             f"🛒 <b>{product_name}</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📦 <b>Package Info:</b>\n"
-            f"┠ <b>1 DAY : ₹{prices.get('1d', 50)}</b> - {stock_1d} stock\n"
-            f"{'✅ <b>Stock Available</b>' if stock_1d > 0 else '❌ <b>Out of Stock</b>'}\n\n"
-            f"┠ <b>7 DAY : ₹{prices.get('7d', 200)}</b> - {stock_7d} stock\n"
-            f"{'✅ <b>Stock Available</b>' if stock_7d > 0 else '❌ <b>Out of Stock</b>'}\n\n"
-            f"┠ <b>15 DAY : ₹{prices.get('15d', 400)}</b> - {stock_15d} stock\n"
-            f"{'✅ <b>Stock Available</b>' if stock_15d > 0 else '❌ <b>Out of Stock</b>'}\n\n"
-            f"┠ <b>30 DAY : ₹{prices.get('30d', 600)}</b> - {stock_30d} stock\n"
-            f"{'✅ <b>Stock Available</b>' if stock_30d > 0 else '❌ <b>Out of Stock</b>'}\n"
+            f"┠ <b>1 DAY : ₹{prices.get('1d', 50)}</b> - {s1_info}\n"
+            f"{s1_status}\n\n"
+            f"┠ <b>7 DAY : ₹{prices.get('7d', 200)}</b> - {s7_info}\n"
+            f"{s7_status}\n\n"
+            f"┠ <b>15 DAY : ₹{prices.get('15d', 400)}</b> - {s15_info}\n"
+            f"{s15_status}\n\n"
+            f"┠ <b>30 DAY : ₹{prices.get('30d', 600)}</b> - {s30_info}\n"
+            f"{s30_status}\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<i>Prices are auto-calculated based on your tier.</i>"
         )
