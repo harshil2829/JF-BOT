@@ -468,26 +468,14 @@ async def create_upigateway_order(amount, order_id, user_name):
 
 async def generate_key_from_api(product, duration_label, product_id=None):
     """Calls the Alwaysdata API to generate a real key."""
-    api_url = "https://harshilexe.alwaysdata.net/api/generate.php"
-    api_secret = "hxn_secret_12345"
+    api_url = "https://harshilexe.alwaysdata.net/api/bot_generate.php"
+    api_key = "uyen_9a137f775bc7c4c12eb672c9d647cd5e"
     
-    # Map durations from bot format to website format
-    duration_map = {
-        "1d": "1 Day",
-        "3d": "3 Days",
-        "7d": "7 Days",
-        "15d": "15 Days",
-        "30d": "30 Days"
-    }
-    site_duration = duration_map.get(duration_label, "1 Day")
-    
-    # All API queries use product_id = 1 as per user's instructions
     params = {
-        "secret": api_secret,
-        "product_id": 1,
-        "duration": site_duration,
-        "amount": 1,
-        "max_devices": 1
+        "api_key": api_key,
+        "product_id": product_id or 1,
+        "plan_id": duration_label,
+        "max_devices": 2
     }
     
     async with httpx.AsyncClient() as client:
