@@ -1937,7 +1937,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
             
-            await query.edit_message_text(f"✅ <b>TRIAL KEY GENERATED</b>\n━━━━━━━━━━━━━━━━━━\n🏺 <b>Product:</b> {product.upper()}\n🔑 <b>Key:</b> <code>{delivered_key}</code>\n\n<i>Enjoy your trial! Do not leave the channel, or you will be banned.</i>\n\nhttps://t.me/JFFREEAPK\njoin this for apk", parse_mode="HTML")
+            await query.edit_message_text(f"✅ <b>TRIAL KEY GENERATED</b>\n━━━━━━━━━━━━━━━━━━\n🏺 <b>Product:</b> {product.upper()}\n🔑 <b>Key:</b> <code>{delivered_key}</code>\n\n<i>Enjoy your trial! Do not leave the channel, or you will be banned.</i>\n\nhttps://t.me/+6h_mUN2paoQxOWJl\njoin this for apk", parse_mode="HTML")
         else:
             keyboard = [[InlineKeyboardButton("« Back", callback_data="trial_key")]]
             await query.edit_message_text(f"❌ <b>OUT OF STOCK</b>\n━━━━━━━━━━━━━━\nNo trial keys available for {product.upper()} right now.\n\nPlease ask the Admin to restock them.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -2658,7 +2658,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         "━━━━━━━━━━━━━━━━━━\n"
                         f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                         "<i>Thank you for shopping with us!</i>\n\n"
-                        "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
+                        "📱 <b>Get the APK here:</b> https://t.me/+6h_mUN2paoQxOWJl"
                     )
                     debug_log("Editing success msg")
                     await query.edit_message_text(text=success_msg, parse_mode="HTML")
@@ -2767,7 +2767,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
                 "<i>Thank you for shopping with us!</i>\n\n"
-                "📱 <b>Get the APK here:</b> https://t.me/JFFREEAPK"
+                "📱 <b>Get the APK here:</b> https://t.me/+6h_mUN2paoQxOWJl"
             )
             try:
                 await context.bot.send_message(chat_id=target_user_id, text=success_msg, parse_mode="HTML")
@@ -3591,7 +3591,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "━━━━━━━━━━━━━━━━━━\n"
             "Use the menu buttons below to navigate the shop.\n\n"
             "👤 <b>Support:</b> @rajput_harshil\n"
-            "📢 <b>Join Channel:</b> https://t.me/JFFREEAPK"
+            "📢 <b>Join Channel:</b> https://t.me/+6h_mUN2paoQxOWJl"
         )
         await update.message.reply_text(help_text, parse_mode="HTML")
 
