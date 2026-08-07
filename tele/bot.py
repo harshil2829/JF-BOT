@@ -105,6 +105,13 @@ def load_settings():
 def save_settings(settings):
     set_cached("settings", settings)
 
+
+def load_promo_codes():
+    return get_cached("promo_codes", {})
+
+def save_promo_codes(codes):
+    set_cached("promo_codes", codes)
+
 def load_trials():
     return get_cached("trials", {})
 
@@ -920,6 +927,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
                     [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
                     [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
+                    [InlineKeyboardButton("📊 Sales Analytics", callback_data="admin_stats"), InlineKeyboardButton("🎟️ Active Promo Codes", callback_data="admin_list_codes")],
                     [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
                     [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
                     [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
@@ -2915,7 +2923,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📋 Active Resellers", callback_data="admin_listresellers"), InlineKeyboardButton("🔍 View Reseller Logs", callback_data="admin_logsmode")],
             [InlineKeyboardButton("💰 Add Balance", callback_data="admin_guide_bal"), InlineKeyboardButton("💸 Remove Balance", callback_data="admin_remove_bal")],
             [InlineKeyboardButton("🔑 Add Keys (Bulk)", callback_data="admin_add_keys"), InlineKeyboardButton("📜 Trial Logs", callback_data="admin_trial_logs")],
-            [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
+            [InlineKeyboardButton("📊 Sales Analytics", callback_data="admin_stats"), InlineKeyboardButton("🎟️ Active Promo Codes", callback_data="admin_list_codes")],
+                    [InlineKeyboardButton("📦 Product Management", callback_data="admin_prod_mgmt")],
             [InlineKeyboardButton("🔄 Reset Trial Cooldown", callback_data="admin_reset_trial")],
             [InlineKeyboardButton("📦 Check Stock", callback_data="admin_stock")],
             [InlineKeyboardButton("❓ Help Commands", callback_data="admin_help_commands")]
@@ -3355,6 +3364,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         kb = [[InlineKeyboardButton("« Back", callback_data="admin_panel_cb")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
+    
+    elif data == "admin_stats":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        text = await get_stats_text()
+        keyboard = [[InlineKeyboardButton("« Back to Admin", callback_data="admin_panel")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    elif data == "admin_list_codes":
+        if update.effective_user.id not in settings["admin_ids"]: return
+        codes = load_promo_codes()
+        if not codes:
+            text = "🎟️ No active promo codes found.\n\n<i>Create one using:</i>\n<code>/create_code [amount] [max_uses] [code]</code>"
+        else:
+            text = "🎟️ <b>ACTIVE PROMO CODES</b>\n━━━━━━━━━━━━━━━━━━\n"
+            for code, data in codes.items():
+                rem = data.get('max_uses', 1) - data.get('uses_count', 0)
+                text += f"• <code>{code}</code> | ₹{data.get('amount', 0)} | {data.get('uses_count', 0)}/{data.get('max_uses', 1)} uses (Rem: {rem})\n"
+            text += "━━━━━━━━━━━━━━━━━━\n<i>Delete code:</i> <code>/delete_code [CODE]</code>"
+        keyboard = [[InlineKeyboardButton("« Back to Admin", callback_data="admin_panel")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
     elif data == "admin_stock":
         keys = load_keys()
         web_products = load_web_products()
@@ -3427,6 +3456,184 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     else:
         await query.edit_message_text(f"Button: {data}")
+
+
+async def create_code_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    args = context.args
+    if not args or len(args) < 2:
+        await update.message.reply_text(
+            "🎟️ <b>Usage:</b> <code>/create_code [amount] [max_uses] [code_name_optional]</code>\n\n"
+            "<b>Example:</b> <code>/create_code 50 10 WELCOME50</code>",
+            parse_mode="HTML"
+        )
+        return
+        
+    try:
+        amount = float(args[0])
+        max_uses = int(args[1])
+        if amount <= 0 or max_uses <= 0: raise ValueError
+    except:
+        await update.message.reply_text("❌ Amount and max_uses must be positive numbers.")
+        return
+        
+    code_name = args[2].upper() if len(args) > 2 else "GIFT-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    
+    codes = load_promo_codes()
+    codes[code_name] = {
+        "amount": amount,
+        "max_uses": max_uses,
+        "uses_count": 0,
+        "used_by": [],
+        "created_by": user_id
+    }
+    save_promo_codes(codes)
+    
+    await update.message.reply_text(
+        f"✅ <b>PROMO CODE CREATED!</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"🎟️ <b>Code:</b> <code>{code_name}</code>\n"
+        f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
+        f"👥 <b>Max Uses:</b> {max_uses}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Users can claim by typing:</i> <code>/redeem {code_name}</code>",
+        parse_mode="HTML"
+    )
+
+async def redeem_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_id_str = str(user_id)
+    
+    args = context.args
+    if not args:
+        await update.message.reply_text("🎟️ <b>Usage:</b> <code>/redeem [code]</code>", parse_mode="HTML")
+        return
+        
+    code_input = args[0].strip().upper()
+    codes = load_promo_codes()
+    
+    if code_input not in codes:
+        await update.message.reply_text("❌ Invalid or expired promo code.")
+        return
+        
+    cdata = codes[code_input]
+    if cdata.get("uses_count", 0) >= cdata.get("max_uses", 1):
+        await update.message.reply_text("❌ This promo code has reached its maximum usage limit.")
+        return
+        
+    if user_id_str in cdata.get("used_by", []):
+        await update.message.reply_text("⚠️ You have already redeemed this promo code!")
+        return
+        
+    # Grant balance
+    amount = cdata["amount"]
+    balances = load_balances()
+    user_bal = balances.get(user_id_str, 0.0) + amount
+    balances[user_id_str] = user_bal
+    save_balances(balances)
+    
+    # Update promo code record
+    cdata["uses_count"] = cdata.get("uses_count", 0) + 1
+    if "used_by" not in cdata: cdata["used_by"] = []
+    cdata["used_by"].append(user_id_str)
+    codes[code_input] = cdata
+    save_promo_codes(codes)
+    
+    try:
+        log_activity(user_id, f"redeemed promo code {code_input} (+₹{amount})")
+    except:
+        pass
+    
+    await update.message.reply_text(
+        f"🎉 <b>PROMO CODE REDEEMED!</b>\n━━━━━━━━━━━━━━━━━━\n"
+        f"🎟️ <b>Code:</b> <code>{code_input}</code>\n"
+        f"💵 <b>Added Balance:</b> ₹{amount:.2f}\n"
+        f"💰 <b>New Total Balance:</b> ₹{user_bal:.2f}\n"
+        f"━━━━━━━━━━━━━━━━━━",
+        parse_mode="HTML"
+    )
+
+async def list_codes_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    codes = load_promo_codes()
+    if not codes:
+        await update.message.reply_text("🎟️ No active promo codes found.")
+        return
+        
+    text = "🎟️ <b>ACTIVE PROMO CODES</b>\n━━━━━━━━━━━━━━━━━━\n"
+    for code, data in codes.items():
+        rem = data.get('max_uses', 1) - data.get('uses_count', 0)
+        text += f"• <code>{code}</code> | ₹{data.get('amount', 0)} | {data.get('uses_count', 0)}/{data.get('max_uses', 1)} uses (Rem: {rem})\n"
+    text += "━━━━━━━━━━━━━━━━━━\n<i>Delete code:</i> <code>/delete_code [CODE]</code>"
+    await update.message.reply_text(text, parse_mode="HTML")
+
+async def delete_code_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    
+    if not context.args:
+        await update.message.reply_text("Usage: <code>/delete_code [CODE]</code>", parse_mode="HTML")
+        return
+        
+    code_input = context.args[0].strip().upper()
+    codes = load_promo_codes()
+    if code_input in codes:
+        del codes[code_input]
+        save_promo_codes(codes)
+        await update.message.reply_text(f"✅ Promo code <code>{code_input}</code> deleted.", parse_mode="HTML")
+    else:
+        await update.message.reply_text("❌ Code not found.")
+
+async def get_stats_text():
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    users = load_users()
+    total_users = len(users)
+    
+    resellers = load_resellers()
+    active_resellers = sum(1 for uid, expiry in resellers.items() if time.time() < expiry)
+    
+    web_products = load_web_products()
+    total_prods = len(web_products)
+    
+    doc = jf_col.find_one({"_id": "bot_activity_logs"})
+    logs = doc.get("data", []) if doc else []
+    
+    keys_today = sum(1 for l in logs if l.get("time", "").startswith(today_str) and "generated" in l.get("action", ""))
+    total_keys = sum(1 for l in logs if "generated" in l.get("action", ""))
+    
+    codes = load_promo_codes()
+    active_codes = sum(1 for c in codes.values() if c.get("uses_count", 0) < c.get("max_uses", 1))
+    
+    text = (
+        "📊 <b>BOT SALES & BOT ANALYTICS DASHBOARD</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"📅 <b>Date:</b> <code>{today_str}</code>\n\n"
+        f"👥 <b>Total Registered Users:</b> {total_users}\n"
+        f"💼 <b>Active Resellers:</b> {active_resellers}\n"
+        f"📦 <b>Active Products:</b> {total_prods}\n"
+        f"🎟️ <b>Active Promo Codes:</b> {active_codes}\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🔑 <b>Keys Generated Today:</b> {keys_today}\n"
+        f"📦 <b>Total Keys Delivered (Logged):</b> {total_keys}\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "<i>Use /create_code to launch new promo vouchers!</i>"
+    )
+    return text
+
+async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    settings = load_settings()
+    if user_id not in settings["admin_ids"]: return
+    text = await get_stats_text()
+    await update.message.reply_text(text, parse_mode="HTML")
 
 async def add_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
