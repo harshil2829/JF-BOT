@@ -465,10 +465,19 @@ async def generate_key_from_api(product, duration_label, product_id=None):
     api_url = "https://harshilexe.alwaysdata.net/api/bot_generate.php"
     api_key = "uyen_9a137f775bc7c4c12eb672c9d647cd5e"
     
+    plan_map = {
+        "1d": "1",
+        "3d": "2",
+        "7d": "2",
+        "15d": "3",
+        "30d": "4"
+    }
+    plan_id = plan_map.get(duration_label, duration_label)
+    
     params = {
         "api_key": api_key,
         "product_id": product_id or 1,
-        "plan_id": duration_label,
+        "plan_id": plan_id,
         "max_devices": 2
     }
     
