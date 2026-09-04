@@ -1730,10 +1730,56 @@ async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_settings(settings)
         await update.message.reply_text("🔓 <b>All wallet purchases have been unlocked!</b>", parse_mode="HTML")
 
+async def unban_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    if update.effective_user.id not in settings.get("admin_ids", []): return
+    
+    status_msg = await update.message.reply_text("🔄 <b>Processing Unban All...</b>", parse_mode="HTML")
+    trials = load_trials()
+    unbanned_count = 0
+    notified_count = 0
+    
+    for uid, udata in list(trials.items()):
+        if isinstance(udata, dict) and udata.get("banned", False):
+            udata["banned"] = False
+            udata["strikes"] = 0
+            unbanned_count += 1
+            try:
+                if str(uid).isdigit():
+                    await unban_user_from_channels(int(uid), context.bot)
+            except Exception:
+                pass
+                
+            try:
+                msg = (
+                    "🎉 <b>GOOD NEWS! YOU ARE UNBANNED!</b>\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    "Your account has been unbanned by the Admin.\n\n"
+                    "👉 Press /start to access the bot and join official channels!"
+                )
+                await context.bot.send_message(chat_id=int(uid), text=msg, parse_mode="HTML")
+                notified_count += 1
+            except Exception:
+                pass
+
+    if unbanned_count > 0:
+        save_trials(trials)
+        await status_msg.edit_text(
+            f"✅ <b>UNBANNED ALL USERS SUCCESSFULLY!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Total Users Unbanned:</b> {unbanned_count}\n"
+            f"📩 <b>Notifications Sent:</b> {notified_count}\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "<i>Unbanned users have received a notification to press /start and join channels again.</i>",
+            parse_mode="HTML"
+        )
+    else:
+        await status_msg.edit_text("ℹ️ <b>No banned users found in database.</b>", parse_mode="HTML")
+
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
-    if user_id not in settings["admin_ids"]: return
+    if user_id not in settings.get("admin_ids", []): return
     
     users = load_users()
     balances = load_balances()
@@ -1743,20 +1789,33 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     total_users = len(users)
     total_balance = sum(balances.values())
-    total_banned = sum(1 for t in trials.values() if t.get("banned", False))
+    total_banned = sum(1 for t in trials.values() if isinstance(t, dict) and t.get("banned", False))
+    total_trials_claimed = len(trials)
     total_resellers = len(resellers)
-    total_keys = sum(len(k) for k in keys.values())
+    total_keys = sum(len(k) for k in keys.values() if isinstance(k, list))
     
     global_stats = load_global_stats()
     total_keys_used = global_stats.get("total_keys_used", 0)
     
-    msg = f"📊 <b>BOT STATISTICS</b> 📊\n━━━━━━━━━━━━━━\n"
+    refs = load_referrals()
+    ref_users = refs.get("users", {}) if isinstance(refs, dict) else {}
+    total_ref_paid = sum(u.get("earnings", 0.0) for u in ref_users.values() if isinstance(u, dict))
+    total_invited = len(refs.get("referred", [])) if isinstance(refs, dict) else 0
+
+    msg = f"📊 <b>BOT STATISTICS & ANALYTICS</b> 📊\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     msg += f"👥 <b>Total Users:</b> {total_users}\n"
     msg += f"💰 <b>Total User Balances:</b> ₹{total_balance:.2f}\n"
-    msg += f"🚫 <b>Banned Users (Trials):</b> {total_banned}\n"
-    msg += f"💼 <b>Active Resellers:</b> {total_resellers}\n"
+    msg += f"🎁 <b>Total Referrals Invited:</b> {total_invited}\n"
+    msg += f"💸 <b>Referral Rewards Paid:</b> ₹{total_ref_paid:.2f}\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     msg += f"📦 <b>Total Keys in Stock:</b> {total_keys}\n"
     msg += f"🔑 <b>Total Keys Generated:</b> {total_keys_used}\n"
+    msg += f"🎁 <b>Total Trial Keys Claimed:</b> {total_trials_claimed}\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"🚫 <b>Banned Users (Trials):</b> {total_banned}\n"
+    msg += f"💼 <b>Active Resellers:</b> {total_resellers}\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━"
     
     await update.message.reply_text(msg, parse_mode="HTML")
 
@@ -3683,6 +3742,7 @@ async def run_bot():
     application.add_handler(CommandHandler("add_balance", add_balance_cmd))
     application.add_handler(CommandHandler("ban", ban_cmd))
     application.add_handler(CommandHandler("unban", unban_cmd))
+    application.add_handler(CommandHandler("unban_all", unban_all_cmd))
     application.add_handler(CommandHandler("check_history", check_history_cmd))
     application.add_handler(CommandHandler("check_balance", check_balance_cmd))
     application.add_handler(CommandHandler("check_user", check_user_cmd))
