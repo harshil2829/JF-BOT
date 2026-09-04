@@ -500,21 +500,7 @@ async def generate_key_from_api(product, duration_label, product_id=None):
             
     return None
 
-async def reset_key_api(key: str):
-    """Calls the Alwaysdata API to reset HWID for a key."""
-    api_url = "https://harshilexe.alwaysdata.net/api/bot_reset_key.php"
-    master_secret = "harshil_master_hwid_reset_2026"
-    params = {
-        "master_secret": master_secret,
-        "key": key.strip()
-    }
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(api_url, params=params, timeout=15)
-            return response.json()
-        except Exception as e:
-            logger.error(f"Reset HWID API Error: {e}")
-            return {"status": False, "message": f"Connection error: {e}"}
+
 
 # --- HANDLERS ---
 
@@ -528,22 +514,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Referral System
     if context.args and len(context.args) > 0:
-        referrer_id = context.args[0]
+        referrer_id_str = str(context.args[0]).strip()
+        user_id_str = str(user_id).strip()
         settings = load_settings()
-        if not settings.get("refer_locked", False) and str(referrer_id).isdigit() and str(referrer_id) != str(user_id):
+        
+        if not settings.get("refer_locked", False) and referrer_id_str.isdigit() and referrer_id_str != user_id_str:
             refs = load_referrals()
             if "referred" not in refs: refs["referred"] = []
             if "users" not in refs: refs["users"] = {}
-            if user_id not in refs["referred"]:
-                refs["referred"].append(user_id)
+            
+            # Check both int and string format to avoid missing rewards
+            referred_set = set(str(r) for r in refs["referred"])
+            if user_id_str not in referred_set:
+                refs["referred"].append(user_id_str)
                 
-                if referrer_id not in refs["users"]: 
-                    refs["users"][referrer_id] = {"count": 0, "earnings": 0.0, "daily_count": 0, "date": ""}
+                ref_user_key = referrer_id_str
+                if ref_user_key not in refs["users"] and int(referrer_id_str) in refs["users"]:
+                    ref_user_key = int(referrer_id_str)
+                elif ref_user_key not in refs["users"]:
+                    refs["users"][ref_user_key] = {"count": 0, "earnings": 0.0, "daily_count": 0, "date": ""}
                 
                 from datetime import datetime
                 today_str = datetime.now().strftime("%Y-%m-%d")
                 
-                user_data = refs["users"][referrer_id]
+                user_data = refs["users"][ref_user_key]
                 if user_data.get("date") != today_str:
                     user_data["date"] = today_str
                     user_data["daily_count"] = 0
@@ -555,18 +549,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     save_referrals(refs)
                     
                     bals = load_balances()
-                    bals[str(referrer_id)] = bals.get(str(referrer_id), 0.0) + 10.0
+                    # Consolidate int and str keys so user balance is never split
+                    cur_bal = 0.0
+                    if referrer_id_str in bals:
+                        cur_bal += float(bals[referrer_id_str])
+                    if int(referrer_id_str) in bals:
+                        cur_bal += float(bals[int(referrer_id_str)])
+                        del bals[int(referrer_id_str)]
+                        
+                    bals[referrer_id_str] = cur_bal + 10.0
                     save_balances(bals)
                     
                     try:
-                        await context.bot.send_message(chat_id=int(referrer_id), text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00! (Daily Limit: {user_data['daily_count']}/5)", parse_mode="HTML")
+                        await context.bot.send_message(
+                            chat_id=int(referrer_id_str),
+                            text=f"🎉 <b>New Referral!</b>\nSomeone joined using your link. You earned ₹10.00! (Daily Limit: {user_data['daily_count']}/5)",
+                            parse_mode="HTML"
+                        )
                     except:
                         pass
                 else:
-                    # Over daily limit, still save that they referred so the new user isn't prompted again
                     save_referrals(refs)
                     try:
-                        await context.bot.send_message(chat_id=int(referrer_id), text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 5 paid referrals per day. You did not earn ₹10 for this one.", parse_mode="HTML")
+                        await context.bot.send_message(
+                            chat_id=int(referrer_id_str),
+                            text=f"⚠️ <b>Referral Limit Reached!</b>\nSomeone joined using your link, but you have reached the maximum limit of 5 paid referrals per day. You did not earn ₹10 for this one.",
+                            parse_mode="HTML"
+                        )
                     except:
                         pass
     
@@ -652,59 +661,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     
     
-    if state == "awaiting_reset_key":
-        raw_text = update.message.text.strip() if update.message and update.message.text else ""
-        if not raw_text or raw_text.startswith("/") or raw_text in ["👑 Admin Panel", "cancel"]:
-            context.user_data["state"] = None
-            return
 
-        context.user_data["state"] = None
-        status_msg = await update.message.reply_text("🔄 <b>Processing HWID reset request...</b>", parse_mode="HTML")
-        result = await reset_key_api(raw_text)
-
-        if result.get("status") is True:
-            res_count = result.get("reset_count", 1)
-            max_res = result.get("max_resets", 2)
-            rem_res = result.get("remaining_resets", 0)
-            reseller = result.get("reseller", "")
-
-            msg = (
-                "✅ <b>HWID RESET SUCCESSFUL!</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"🔑 <b>Key:</b> <code>{raw_text}</code>\n"
-                f"📊 <b>Resets Used:</b> {res_count} / {max_res}\n"
-                f"⏳ <b>Remaining Resets:</b> {rem_res}\n"
-            )
-            if reseller:
-                msg += f"👤 <b>Reseller:</b> {reseller}\n"
-            msg += "━━━━━━━━━━━━━━━━━━\n"
-            msg += "<i>Your key has been reset and can now be used on a new device!</i>"
-
-            await status_msg.edit_text(msg, parse_mode="HTML")
-            try:
-                log_activity(update.effective_user.id, f"reset HWID for key {raw_text}")
-            except:
-                pass
-        else:
-            err_msg = result.get("message", "Reset failed. Please check the key and try again.")
-            res_count = result.get("reset_count")
-            max_res = result.get("max_resets")
-            reseller = result.get("reseller")
-
-            msg = (
-                "❌ <b>HWID RESET FAILED</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"🔑 <b>Key:</b> <code>{raw_text}</code>\n"
-                f"💬 <b>Reason:</b> {err_msg}\n"
-            )
-            if res_count is not None and max_res is not None:
-                msg += f"📊 <b>Resets Used:</b> {res_count} / {max_res}\n"
-            if reseller:
-                msg += f"👤 <b>Reseller:</b> {reseller}\n"
-            msg += "━━━━━━━━━━━━━━━━━━"
-
-            await status_msg.edit_text(msg, parse_mode="HTML")
-        return
 
     if state == "awaiting_new_product_price":
         if update.effective_user.id not in settings["admin_ids"]: return
@@ -1013,10 +970,7 @@ def get_main_menu_keyboard():
             InlineKeyboardButton("🎬 How To Use Bot", callback_data="how_to_use"),
             InlineKeyboardButton("📞 Connect Helpline", callback_data="helpline")
         ],
-        [
-            InlineKeyboardButton("🎁 Get Trial Key", callback_data="trial_key"),
-            InlineKeyboardButton("🔄 Reset Key / HWID", callback_data="reset_hwid_start")
-        ]
+        [InlineKeyboardButton("🎁 Get Trial Key", callback_data="trial_key")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -2294,18 +2248,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Back", callback_data="main_menu")]]),
             parse_mode="HTML"
         )
-    elif data == "reset_hwid_start":
-        context.user_data["state"] = "awaiting_reset_key"
-        keyboard = [[InlineKeyboardButton("« Back to Main Menu", callback_data="main_menu")]]
-        await query.edit_message_text(
-            "🔄 <b>RESET KEY / HWID</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "Please send the <b>License Key</b> you want to reset HWID for:\n"
-            "(e.g., <code>VIP-123456</code>)\n\n"
-            "⚠️ <i>Note: Each key can only be reset up to 2 times.</i>",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
+
     elif data.startswith("product_"):
         product_key = data.replace("product_", "").lower()
         product_name = data.replace("product_", "").upper().replace("_", " ")
