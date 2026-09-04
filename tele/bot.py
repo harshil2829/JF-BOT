@@ -1780,45 +1780,48 @@ async def unban_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
     if update.effective_user.id not in settings.get("admin_ids", []): return
     
-    status_msg = await update.message.reply_text("🔄 <b>Processing Unban All...</b>", parse_mode="HTML")
+    status_msg = await update.message.reply_text("🔄 <b>Unbanning all users in database...</b>", parse_mode="HTML")
     trials = load_trials()
     unbanned_count = 0
-    notified_count = 0
+    banned_ids = []
     
     for uid, udata in list(trials.items()):
         if isinstance(udata, dict) and udata.get("banned", False):
             udata["banned"] = False
             udata["strikes"] = 0
             unbanned_count += 1
-            try:
-                if str(uid).isdigit():
-                    await unban_user_from_channels(int(uid), context.bot)
-            except Exception:
-                pass
-                
-            try:
-                msg = (
-                    "🎉 <b>GOOD NEWS! YOU ARE UNBANNED!</b>\n"
-                    "━━━━━━━━━━━━━━━━━━\n"
-                    "Your account has been unbanned by the Admin.\n\n"
-                    "👉 Press /start to access the bot and join official channels!"
-                )
-                await context.bot.send_message(chat_id=int(uid), text=msg, parse_mode="HTML")
-                notified_count += 1
-            except Exception:
-                pass
+            banned_ids.append(uid)
 
     if unbanned_count > 0:
         save_trials(trials)
         await status_msg.edit_text(
-            f"✅ <b>UNBANNED ALL USERS SUCCESSFULLY!</b>\n"
+            f"✅ <b>UNBANNED ALL {unbanned_count} USERS IN DATABASE!</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"👤 <b>Total Users Unbanned:</b> {unbanned_count}\n"
-            f"📩 <b>Notifications Sent:</b> {notified_count}\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "<i>Unbanned users have received a notification to press /start and join channels again.</i>",
+            "<i>Broadcasting unban notifications to users in background...</i>",
             parse_mode="HTML"
         )
+        
+        async def bg_notify():
+            for uid in banned_ids:
+                try:
+                    if str(uid).isdigit():
+                        await unban_user_from_channels(int(uid), context.bot)
+                except Exception: pass
+                
+                try:
+                    msg = (
+                        "🎉 <b>GOOD NEWS! YOU ARE UNBANNED!</b>\n"
+                        "━━━━━━━━━━━━━━━━━━\n"
+                        "Your account has been unbanned by the Admin.\n\n"
+                        "👉 Press /start to access the bot and join official channels!"
+                    )
+                    await context.bot.send_message(chat_id=int(uid), text=msg, parse_mode="HTML")
+                except Exception: pass
+                await asyncio.sleep(0.05)
+                
+        asyncio.create_task(bg_notify())
     else:
         await status_msg.edit_text("ℹ️ <b>No banned users found in database.</b>", parse_mode="HTML")
 
