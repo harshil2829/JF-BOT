@@ -1690,33 +1690,30 @@ async def unlock_refer_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def lock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
-    if user_id not in settings["admin_ids"]: return
+    if user_id not in settings.get("admin_ids", []): return
     
     if context.args:
-        full_text = " ".join(context.args).lower().strip()
-        raw_parts = [p.strip() for p in full_text.split(",")]
+        raw_input = " ".join(context.args).lower()
+        parts = [p.strip() for p in raw_input.replace(",", " ").split() if p.strip()]
         
+        valid_durations = ["1d", "7d", "15d", "30d"]
         targets = []
         current_product = None
-        for part in raw_parts:
-            if " " in part:
-                sub_parts = part.split()
-                if sub_parts[0] not in ["1d", "7d", "15d", "30d"] and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
-                    current_product = sub_parts[0]
-                    targets.append(f"{sub_parts[0]}_{sub_parts[1]}")
-                else:
-                    targets.append("_".join(sub_parts))
-            else:
-                if "_" in part:
-                    sub_parts = part.split("_")
-                    if len(sub_parts) == 2 and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
-                        current_product = sub_parts[0]
-                    targets.append(part)
-                elif part in ["1d", "7d", "15d", "30d"] and current_product:
+        
+        for part in parts:
+            if part in valid_durations:
+                if current_product:
                     targets.append(f"{current_product}_{part}")
-                else:
-                    targets.append(part)
-                    
+                targets.append(part)
+            elif "_" in part:
+                p_parts = part.split("_")
+                if len(p_parts) == 2 and p_parts[1] in valid_durations:
+                    current_product = p_parts[0]
+                targets.append(part)
+            else:
+                current_product = part
+                targets.append(part)
+                
         if "wallet_locked_products" not in settings or not isinstance(settings["wallet_locked_products"], list):
             settings["wallet_locked_products"] = []
             
@@ -1735,33 +1732,30 @@ async def lock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     settings = load_settings()
-    if user_id not in settings["admin_ids"]: return
+    if user_id not in settings.get("admin_ids", []): return
     
     if context.args:
-        full_text = " ".join(context.args).lower().strip()
-        raw_parts = [p.strip() for p in full_text.split(",")]
+        raw_input = " ".join(context.args).lower()
+        parts = [p.strip() for p in raw_input.replace(",", " ").split() if p.strip()]
         
+        valid_durations = ["1d", "7d", "15d", "30d"]
         targets = []
         current_product = None
-        for part in raw_parts:
-            if " " in part:
-                sub_parts = part.split()
-                if sub_parts[0] not in ["1d", "7d", "15d", "30d"] and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
-                    current_product = sub_parts[0]
-                    targets.append(f"{sub_parts[0]}_{sub_parts[1]}")
-                else:
-                    targets.append("_".join(sub_parts))
-            else:
-                if "_" in part:
-                    sub_parts = part.split("_")
-                    if len(sub_parts) == 2 and sub_parts[1] in ["1d", "7d", "15d", "30d"]:
-                        current_product = sub_parts[0]
-                    targets.append(part)
-                elif part in ["1d", "7d", "15d", "30d"] and current_product:
+        
+        for part in parts:
+            if part in valid_durations:
+                if current_product:
                     targets.append(f"{current_product}_{part}")
-                else:
-                    targets.append(part)
-                    
+                targets.append(part)
+            elif "_" in part:
+                p_parts = part.split("_")
+                if len(p_parts) == 2 and p_parts[1] in valid_durations:
+                    current_product = p_parts[0]
+                targets.append(part)
+            else:
+                current_product = part
+                targets.append(part)
+                
         if "wallet_locked_products" in settings and isinstance(settings["wallet_locked_products"], list):
             for target in targets:
                 if target in settings["wallet_locked_products"]:
@@ -1769,12 +1763,12 @@ async def unlock_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_settings(settings)
             
         unlocked_display = ", ".join([t.upper().replace("_", " ") for t in targets])
-        await update.message.reply_text(f"🔓 <b>Wallet purchases for [{unlocked_display}] have been unlocked!</b>", parse_mode="HTML")
+        await update.message.reply_text(f"🔓 <b>Wallet purchases for [{unlocked_display}] have been UNLOCKED!</b>", parse_mode="HTML")
     else:
         settings["wallet_buy_locked"] = False
         settings["wallet_locked_products"] = []
         save_settings(settings)
-        await update.message.reply_text("🔓 <b>All wallet purchases have been unlocked!</b>", parse_mode="HTML")
+        await update.message.reply_text("🔓 <b>All wallet purchases have been UNLOCKED!</b>", parse_mode="HTML")
 
 async def unban_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
