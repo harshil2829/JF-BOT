@@ -71,10 +71,10 @@ def check_use_api(product):
             p_name = p.get("name", "").lower().replace("✔️", "").strip()
             if p_name == prod_clean or p_name.startswith(prod_clean) or prod_clean.startswith(p_name):
                 if p.get("use_api") is not None:
-                    return p.get("use_api")
+                    return bool(p.get("use_api"))
     except Exception as e:
         logger.error(f"Error checking check_use_api: {e}")
-    return True
+    return False
 
 def log_activity(user_id, action):
     doc = jf_col.find_one({"_id": "bot_activity_logs"})
