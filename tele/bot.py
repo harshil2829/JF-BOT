@@ -419,8 +419,85 @@ async def check_force_sub(user_id, context):
             
     return True
 
+import imaplib
+import email
+from email.header import decode_header
+import re
+
+FAMPAY_GMAIL = "balvantsinhjadav570@gmail.com"
+FAMPAY_APP_PASSWORD = "mhmeeljvmrszyybf"
+
+async def check_fampay_email_utr(utr_number: str, expected_amount: float = 0.0) -> bool:
+    """Connects to Gmail IMAP to verify FamPay / UPI payment receipt email for UTR."""
+    utr_clean = str(utr_number).strip().lower()
+    if len(utr_clean) < 6:
+        return False
+        
+    def _search_imap():
+        try:
+            mail = imaplib.IMAP4_SSL("imap.gmail.com")
+            mail.login(FAMPAY_GMAIL, FAMPAY_APP_PASSWORD.replace(" ", ""))
+            mail.select("inbox")
+            
+            status, messages = mail.search(None, "ALL")
+            if status != "OK":
+                mail.logout()
+                return False
+                
+            email_ids = messages[0].split()
+            recent_ids = email_ids[-60:]
+            
+            for eid in reversed(recent_ids):
+                res, msg_data = mail.fetch(eid, "(RFC822)")
+                if res != "OK": continue
+                
+                for response_part in msg_data:
+                    if isinstance(response_part, tuple):
+                        msg = email.message_from_bytes(response_part[1])
+                        
+                        body_text = ""
+                        if msg.is_multipart():
+                            for part in msg.walk():
+                                content_type = part.get_content_type()
+                                content_disp = str(part.get("Content-Disposition"))
+                                if content_type == "text/plain" and "attachment" not in content_disp:
+                                    payload = part.get_payload(decode=True)
+                                    if payload:
+                                        body_text += payload.decode(errors="ignore") + "\n"
+                                elif content_type == "text/html" and "attachment" not in content_disp:
+                                    payload = part.get_payload(decode=True)
+                                    if payload:
+                                        raw_html = payload.decode(errors="ignore")
+                                        body_text += re.sub('<[^<]+?>', ' ', raw_html) + "\n"
+                        else:
+                            payload = msg.get_payload(decode=True)
+                            if payload:
+                                body_text = payload.decode(errors="ignore")
+                                
+                        subject = str(msg.get("Subject", ""))
+                        full_content = f"{subject}\n{body_text}".lower()
+                        
+                        if utr_clean in full_content:
+                            mail.logout()
+                            return True
+                            
+            mail.logout()
+        except Exception as e:
+            logger.error(f"FamPay IMAP Verification Error: {e}")
+        return False
+        
+    return await asyncio.to_thread(_search_imap)
+
 async def verify_utr_api(client_txn_id, amount):
-    """Checks the order status on UPIGateway.com."""
+    """Checks FamPay Gmail IMAP and UPIGateway.com for automatic payment verification."""
+    try:
+        fampay_verified = await check_fampay_email_utr(client_txn_id, float(amount) if amount else 0.0)
+        if fampay_verified:
+            logger.info(f"✅ FamPay UTR {client_txn_id} verified successfully via Gmail IMAP!")
+            return "success"
+    except Exception as e:
+        logger.error(f"FamPay verification error: {e}")
+
     if not IS_AUTO_MODE:
         return "manual"
         
@@ -432,7 +509,6 @@ async def verify_utr_api(client_txn_id, amount):
     
     async with httpx.AsyncClient() as client:
         try:
-            # Use POST as per UPIGateway docs usually
             response = await client.post(api_url, data=params, timeout=10)
             data = response.json()
             if data.get("status") is True and data.get("data", {}).get("status") == "COMPLETED":
@@ -852,8 +928,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ <b>Error:</b> This Transaction ID (UTR) has already been used!")
             return
 
-        # 2. Check if Auto-Mode is ON
-        if IS_AUTO_MODE and utr and utr.isdigit() and len(utr) == 12:
+        # 2. Check if Auto-Mode / FamPay Verification is ON
+        if utr and len(utr.strip()) >= 6:
             status_msg = await update.message.reply_text("⏳ <b>Verifying your payment...</b> Please wait.", parse_mode="HTML")
             api_status = await verify_utr_api(utr, amount)
             
