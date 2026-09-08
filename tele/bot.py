@@ -2620,7 +2620,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             wallet_limit = int(settings.get("user_wallet_limits", {}).get(user_id_str, global_limit))
             already_bought_today = (purchases_today >= wallet_limit)
             
-            if not is_admin and (wallet_locked or product_locked or already_bought_today) and not is_reseller:
+            if (wallet_locked or product_locked or already_bought_today) and not is_reseller:
                 title = "❌ <b>WALLET PURCHASE DISABLED</b>"
                 reason_msg = f"⚠️ <i>You have already reached the limit of {wallet_limit} key(s) today using Wallet balance. Please pay using the QR code below for additional purchases.</i>" if already_bought_today else "⚠️ <i>Wallet payments are temporarily disabled for this product/action for normal users by Admin. Please pay using the QR code below.</i>"
                 full_payment_text = (
