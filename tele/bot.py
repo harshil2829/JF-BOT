@@ -426,9 +426,20 @@ import re
 
 FAMPAY_GMAIL = "balvantsinhjadav570@gmail.com"
 FAMPAY_APP_PASSWORD = "mhmeeljvmrszyybf"
+DEFAULT_UPI_ID = "jadavharshil@fam"
+
+import urllib.parse
+
+def get_dynamic_qr_url(amount_str, order_id, upi_id=None):
+    if not upi_id:
+        upi_id = DEFAULT_UPI_ID
+    clean_amount = f"{float(amount_str):.2f}"
+    upi_uri = f"upi://pay?pa={upi_id}&pn=HXN%20STORE&am={clean_amount}&cu=INR&tn={order_id}"
+    encoded_uri = urllib.parse.quote(upi_uri)
+    return f"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={encoded_uri}"
 
 async def check_fampay_email_utr(utr_number: str, expected_amount: float = 0.0) -> bool:
-    """Connects to Gmail IMAP to verify FamPay / UPI payment receipt email for UTR."""
+    """Connects to Gmail IMAP to verify FamPay / UPI payment receipt email for UTR & Amount."""
     utr_clean = str(utr_number).strip().lower()
     if len(utr_clean) < 6:
         return False
@@ -478,6 +489,24 @@ async def check_fampay_email_utr(utr_number: str, expected_amount: float = 0.0) 
                         full_content = f"{subject}\n{body_text}".lower()
                         
                         if utr_clean in full_content:
+                            if expected_amount > 0:
+                                money_values = re.findall(r'(?:₹|rs\.?|inr|\bamt\b|\bamount\b)?\s*([\d]+(?:\.[\d]{1,2})?)', full_content)
+                                float_expected = float(expected_amount)
+                                
+                                found_valid_amount = False
+                                for m_val in money_values:
+                                    try:
+                                        val = float(m_val)
+                                        if val >= float_expected:
+                                            found_valid_amount = True
+                                            break
+                                    except: pass
+                                    
+                                if not found_valid_amount:
+                                    logger.warning(f"FamPay UTR {utr_clean} found but email amount did not match expected ₹{expected_amount}")
+                                    mail.logout()
+                                    return False
+                                    
                             mail.logout()
                             return True
                             
@@ -2537,12 +2566,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount = price_map.get(duration, "0.00")
         order_id = "OID" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         
-        # Store transaction details
-        context.user_data["product"] = product_key
-        context.user_data["amount"] = amount
-        context.user_data["duration"] = duration
-        context.user_data["order_id"] = order_id
-        
         user_id_str = str(query.from_user.id)
         balances = load_balances()
         resellers = load_resellers()
@@ -2554,7 +2577,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_reseller:
             float_amount = float_amount * 0.7  # 30% Discount
             amount = f"{float_amount:.2f}"
-            context.user_data["amount"] = amount
+
+        # Generate Unique Paisa Discount (1-99 Paisa Off for Unique QR Scanner Pay Amount)
+        paisa_discount = random.randint(1, 99) / 100.0
+        scanner_amount = round(max(1.0, float_amount - paisa_discount), 2)
+        scanner_amount_str = f"{scanner_amount:.2f}"
+        
+        # Store transaction details
+        context.user_data["product"] = product_key
+        context.user_data["amount"] = amount
+        context.user_data["scanner_amount"] = scanner_amount_str
+        context.user_data["duration"] = duration
+        context.user_data["order_id"] = order_id
             
         await query.message.delete()
         
@@ -2596,30 +2630,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"{title}\n\n"
                     f"🏺 <b>Product:</b> {product_name}\n"
                     f"⏳ <b>Duration:</b> {days}\n"
-                    f"💵 <b>Pay Amount:</b> ₹{amount}\n"
+                    f"💵 <b>Original Price:</b> ₹{amount}\n"
+                    f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
                     f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
-                    f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
-                    "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
+                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+                    f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code for instant auto-verification!</i>"
                 )
                 full_keyboard = [
                     [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"confirm_{order_id}")],
                     [InlineKeyboardButton("« Back to Store", callback_data="shop")]
                 ]
-                if os.path.exists("qr.png"):
+                dynamic_qr_url = get_dynamic_qr_url(scanner_amount_str, order_id)
+                try:
                     await context.bot.send_photo(
                         chat_id=query.message.chat_id,
-                        photo=open("qr.png", "rb"),
+                        photo=dynamic_qr_url,
                         caption=full_payment_text,
                         reply_markup=InlineKeyboardMarkup(full_keyboard),
                         parse_mode="HTML"
                     )
-                else:
-                    await context.bot.send_message(
-                        chat_id=query.message.chat_id,
-                        text=full_payment_text + "\n\n⚠️ <i>(QR Code image missing on server)</i>",
-                        reply_markup=InlineKeyboardMarkup(full_keyboard),
-                        parse_mode="HTML"
-                    )
+                except Exception:
+                    if os.path.exists("qr.png"):
+                        await context.bot.send_photo(
+                            chat_id=query.message.chat_id,
+                            photo=open("qr.png", "rb"),
+                            caption=full_payment_text,
+                            reply_markup=InlineKeyboardMarkup(full_keyboard),
+                            parse_mode="HTML"
+                        )
+                    else:
+                        await context.bot.send_message(
+                            chat_id=query.message.chat_id,
+                            text=full_payment_text + "\n\n⚠️ <i>(QR Code image missing on server)</i>",
+                            reply_markup=InlineKeyboardMarkup(full_keyboard),
+                            parse_mode="HTML"
+                        )
             else:
                 if is_admin:
                     title = "👑 <b>ADMIN CHECKOUT</b>"
@@ -2657,10 +2702,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"{title}\n\n"
                 f"🏺 <b>Product:</b> {product_name}\n"
                 f"⏳ <b>Duration:</b> {days}\n"
-                f"💵 <b>Pay Amount:</b> ₹{amount}\n"
+                f"💵 <b>Original Price:</b> ₹{amount}\n"
+                f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
                 f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
-                f"🆔 <b>Order ID:</b>\n<code>{order_id}</code>\n\n"
-                "<i>Scan the QR code to pay, then click 'Paid Confirmation'.</i>"
+                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
+                f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code for instant auto-verification!</i>"
             )
             
             full_keyboard = [
@@ -2668,21 +2714,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("« Back to Store", callback_data="shop")]
             ]
             
-            if os.path.exists("qr.png"):
+            dynamic_qr_url = get_dynamic_qr_url(scanner_amount_str, order_id)
+            try:
                 await context.bot.send_photo(
                     chat_id=query.message.chat_id,
-                    photo=open("qr.png", "rb"),
+                    photo=dynamic_qr_url,
                     caption=full_payment_text,
                     reply_markup=InlineKeyboardMarkup(full_keyboard),
                     parse_mode="HTML"
                 )
-            else:
-                await context.bot.send_message(
-                    chat_id=query.message.chat_id,
-                    text=full_payment_text + "\n\n⚠️ <i>(QR Code image missing on server)</i>",
-                    reply_markup=InlineKeyboardMarkup(full_keyboard),
-                    parse_mode="HTML"
-                )
+            except Exception:
+                if os.path.exists("qr.png"):
+                    await context.bot.send_photo(
+                        chat_id=query.message.chat_id,
+                        photo=open("qr.png", "rb"),
+                        caption=full_payment_text,
+                        reply_markup=InlineKeyboardMarkup(full_keyboard),
+                        parse_mode="HTML"
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=query.message.chat_id,
+                        text=full_payment_text + "\n\n⚠️ <i>(QR Code image missing on server)</i>",
+                        reply_markup=InlineKeyboardMarkup(full_keyboard),
+                        parse_mode="HTML"
+                    )
 
     elif data.startswith("walletpay_"):
         try:
@@ -2842,6 +2898,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"⚠️ INTERNAL ERROR:\n<pre>{err[-500:]}</pre>", parse_mode="HTML")
     elif data.startswith("confirm_"):
         order_id = data.split("_")[1]
+        scanner_amt = context.user_data.get("scanner_amount")
+        
+        if scanner_amt:
+            # Auto-check Gmail IMAP for exact scanner amount match
+            is_found = await check_fampay_email_utr(scanner_amt)
+            if is_found:
+                product = context.user_data.get("product", "hxn")
+                duration_label = context.user_data.get("duration", "1d")
+                keys = load_keys()
+                prod_key = product.lower()
+                delivered_key = None
+                if prod_key in keys and len(keys[prod_key]) > 0:
+                    delivered_key = keys[prod_key].pop(0)
+                    save_keys(keys)
+                    
+                if delivered_key:
+                    success_msg = (
+                        "✅ <b>AUTO-VERIFIED VIA FAMPAY!</b>\n"
+                        "━━━━━━━━━━━━━━━━━━\n"
+                        f"💵 <b>Paid Amount:</b> ₹{scanner_amt}\n"
+                        f"🔑 <b>YOUR KEY:</b>\n<code>{delivered_key}</code>\n\n"
+                        "<i>Thank you for shopping!</i>"
+                    )
+                    try:
+                        if query.message.photo:
+                            await query.edit_message_caption(caption=success_msg, parse_mode="HTML")
+                        else:
+                            await query.edit_message_text(text=success_msg, parse_mode="HTML")
+                    except: pass
+                    return
+
         confirm_text = (
             f"<b>ORDER ID:</b> <code>{order_id}</code>\n"
             "━━━━━━━━━━━━━━━━━━\n"
