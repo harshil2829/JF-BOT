@@ -434,7 +434,7 @@ def get_dynamic_qr_url(amount_str, order_id, upi_id=None):
     if not upi_id:
         upi_id = DEFAULT_UPI_ID
     clean_amount = f"{float(amount_str):.2f}"
-    upi_uri = f"upi://pay?pa={upi_id}&pn=HXN%20STORE&am={clean_amount}&cu=INR&tn={order_id}"
+    upi_uri = f"upi://pay?pa={upi_id}&pn=SHADOW%20STORE&am={clean_amount}&cu=INR&tn={order_id}"
     encoded_uri = urllib.parse.quote(upi_uri)
     return f"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={encoded_uri}"
 
