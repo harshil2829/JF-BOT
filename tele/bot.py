@@ -871,22 +871,35 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 import uuid
                 order_id = str(uuid.uuid4().hex)[:8]
                 
+                # Generate Unique Paisa Discount for Add Balance
+                paisa_discount = random.randint(1, 99) / 100.0
+                scanner_amount = round(max(1.0, amount - paisa_discount), 2)
+                scanner_amount_str = f"{scanner_amount:.2f}"
+                context.user_data["balance_scanner_amount"] = scanner_amount_str
+                
                 reply_text = (
                     "💰 <b>ADD BALANCE REQUEST</b>\n"
                     "━━━━━━━━━━━━━━━━━━\n"
-                    f"💵 <b>Amount:</b> ₹{amount:.2f}\n"
+                    f"💵 <b>Wallet Credit:</b> ₹{amount:.2f}\n"
+                    f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
+                    f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
                     f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-                    "<i>Scan the QR code below to pay, then click '✅ I Have Paid'.</i>"
+                    f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code for instant auto-balance credit!</i>"
                 )
                 keyboard = [
-                    [InlineKeyboardButton("✅ I Have Paid", callback_data=f"balconfirm_{order_id}_{amount}")],
+                    [InlineKeyboardButton("✅ I Have Paid", callback_data=f"balconfirm_{order_id}_{amount}_{scanner_amount_str}")],
                     [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
                 ]
-                import os
-                if os.path.exists("qr.png"):
-                    await update.message.reply_photo(photo=open("qr.png", "rb"), caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-                else:
-                    await update.message.reply_text(reply_text + "\n\n⚠️ <i>(QR Code missing)</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+                
+                dynamic_qr_url = get_dynamic_qr_url(scanner_amount_str, order_id)
+                try:
+                    await update.message.reply_photo(photo=dynamic_qr_url, caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+                except Exception:
+                    import os
+                    if os.path.exists("qr.png"):
+                        await update.message.reply_photo(photo=open("qr.png", "rb"), caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+                    else:
+                        await update.message.reply_text(reply_text + "\n\n⚠️ <i>(QR Code missing)</i>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
                 return
             except:
                 await update.message.reply_text("❌ Please enter a valid positive number.")
@@ -2270,8 +2283,50 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         order_id = parts[1]
         amount = float(parts[2])
+        scanner_amt = parts[3] if len(parts) > 3 else context.user_data.get("balance_scanner_amount")
         username = f"@{query.from_user.username}" if query.from_user.username else query.from_user.first_name
         user_id = query.from_user.id
+        
+        if scanner_amt:
+            is_found = await check_fampay_email_utr(scanner_amt)
+            if is_found:
+                user_id_str = str(user_id)
+                balances = load_balances()
+                current_bal = balances.get(user_id_str, 0.0)
+                new_bal = current_bal + amount
+                balances[user_id_str] = new_bal
+                save_balances(balances)
+                log_activity(user_id_str, f"auto added balance ₹{amount:.2f} via FamPay")
+                
+                success_text = (
+                    "✅ <b>BALANCE AUTO-ADDED VIA FAMPAY!</b>\n"
+                    "━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 <b>Paid Amount:</b> ₹{scanner_amt}\n"
+                    f"💰 <b>Added to Wallet:</b> ₹{amount:.2f}\n"
+                    f"💳 <b>New Wallet Balance:</b> ₹{new_bal:.2f}\n\n"
+                    "<i>Thank you for recharging!</i>"
+                )
+                try:
+                    if query.message.photo:
+                        await query.edit_message_caption(caption=success_text, parse_mode="HTML")
+                    else:
+                        await query.edit_message_text(text=success_text, parse_mode="HTML")
+                except: pass
+                
+                settings = load_settings()
+                for admin_id in settings.get("admin_ids", []):
+                    try:
+                        admin_msg = (
+                            f"🔔 <b>AUTO BALANCE ADDED</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━\n"
+                            f"👤 <b>User:</b> {username} (<code>{user_id}</code>)\n"
+                            f"💵 <b>Amount Paid:</b> ₹{scanner_amt}\n"
+                            f"💰 <b>Wallet Credited:</b> ₹{amount:.2f}\n"
+                            f"💳 <b>New Balance:</b> ₹{new_bal:.2f}\n"
+                        )
+                        await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
+                    except: pass
+                return
         
         settings = load_settings()
         admin_messages = {}
