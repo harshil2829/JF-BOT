@@ -876,6 +876,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 scanner_amount = round(max(1.0, amount - paisa_discount), 2)
                 scanner_amount_str = f"{scanner_amount:.2f}"
                 context.user_data["balance_scanner_amount"] = scanner_amount_str
+                context.user_data["qr_created_at"] = time.time()
                 
                 reply_text = (
                     "💰 <b>ADD BALANCE REQUEST</b>\n"
@@ -883,8 +884,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"💵 <b>Wallet Credit:</b> ₹{amount:.2f}\n"
                     f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
                     f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
-                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-                    f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code for instant auto-balance credit!</i>"
+                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+                    "⏳ <b>QR Expiry:</b> <code>5 Minutes</code>\n\n"
+                    f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code within 5 minutes for instant auto-balance credit!</i>"
                 )
                 keyboard = [
                     [InlineKeyboardButton("✅ I Have Paid", callback_data=f"balconfirm_{order_id}_{amount}_{scanner_amount_str}")],
@@ -2287,6 +2289,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = f"@{query.from_user.username}" if query.from_user.username else query.from_user.first_name
         user_id = query.from_user.id
         
+        created_at = context.user_data.get("qr_created_at", 0)
+        if created_at > 0 and (time.time() - created_at > 300):
+            expired_msg = (
+                "⏰ <b>QR PAYMENT SESSION EXPIRED!</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ This QR payment session has expired after <b>5 minutes</b>.\n"
+                "Please request a new balance QR code to complete your payment."
+            )
+            back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Menu", callback_data="main_menu")]])
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=expired_msg, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=expired_msg, reply_markup=back_kb, parse_mode="HTML")
+            except: pass
+            return
+
         if scanner_amt:
             is_found = await check_fampay_email_utr(scanner_amt)
             if is_found:
@@ -2644,6 +2663,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["scanner_amount"] = scanner_amount_str
         context.user_data["duration"] = duration
         context.user_data["order_id"] = order_id
+        context.user_data["qr_created_at"] = time.time()
             
         await query.message.delete()
         
@@ -2954,7 +2974,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("confirm_"):
         order_id = data.split("_")[1]
         scanner_amt = context.user_data.get("scanner_amount")
+        created_at = context.user_data.get("qr_created_at", 0)
         
+        if created_at > 0 and (time.time() - created_at > 300):
+            expired_text = (
+                "⏰ <b>QR PAYMENT SESSION EXPIRED!</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ This QR payment session has expired after <b>5 minutes</b>.\n"
+                "Please return to the store and generate a new QR code to complete your payment."
+            )
+            back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Store", callback_data="shop")]])
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=expired_text, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=expired_text, reply_markup=back_kb, parse_mode="HTML")
+            except: pass
+            return
+
         if scanner_amt:
             # Auto-check Gmail IMAP for exact scanner amount match
             is_found = await check_fampay_email_utr(scanner_amt)
