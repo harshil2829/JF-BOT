@@ -4464,56 +4464,6 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def ensure_default_products():
     pass
 
-async def run_bot():
-    # Re-ban all users who have 3+ strikes but are not currently banned
-    try:
-        trials = load_trials()
-        rebanned = 0
-        for uid, data in trials.items():
-            if data.get("strikes", 0) >= 3 and not data.get("banned", False):
-                data["banned"] = True
-                rebanned += 1
-        if rebanned > 0:
-            save_trials(trials)
-            print(f"Startup reban: {rebanned} users re-banned (had 3+ strikes but were not banned)")
-        banned_total = sum(1 for v in trials.values() if v.get("banned", False))
-        print(f"Total banned users: {banned_total}")
-    except Exception as e:
-        print(f"Error during startup reban: {e}")
-    ensure_default_products()
-    try:
-        keys_db = load_keys()
-        purged = False
-        if isinstance(keys_db, dict):
-            for k in list(keys_db.keys()):
-                if "hotstreamer" in k.lower() or "hot_streamer" in k.lower():
-                    del keys_db[k]
-                    purged = True
-            if purged:
-                save_keys(keys_db)
-                print("Purged deleted product keys (hot streamer) from DB.")
-    except Exception as e:
-        print(f"Error purging keys: {e}")
-
-    application = Application.builder().token(TOKEN).build()
-
-    # Sync bans with Telegram channels in the background
-    async def sync_telegram_bans():
-        await asyncio.sleep(5) # Wait for bot to be ready
-        try:
-            trials = load_trials()
-            banned_uids = [int(uid) for uid, data in trials.items() if data.get("banned", False) and uid.isdigit()]
-            if banned_uids:
-                print(f"Syncing {len(banned_uids)} banned users with Telegram channels...")
-                for uid in banned_uids:
-                    await ban_user_from_channels(uid, application.bot)
-                    await asyncio.sleep(0.5) # Avoid Telegram rate limits
-                print("Telegram ban sync complete!")
-        except Exception as e:
-            print(f"Error during Telegram ban sync: {e}")
-            
-    asyncio.create_task(sync_telegram_bans())
-
 PANEL_URL = "https://harshilexe.alwaysdata.net"
 MASTER_SECRET = "harshil_master_hwid_reset_2026"
 
