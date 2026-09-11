@@ -2707,9 +2707,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"⏳ <b>Duration:</b> {days}\n"
                     f"💵 <b>Original Price:</b> ₹{amount}\n"
                     f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
+                    f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
                     f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
-                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-                    f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code for instant auto-verification!</i>"
+                    f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+                    "⏳ <b>QR Expiry:</b> <code>5 Minutes</code>\n\n"
+                    f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code within 5 minutes for instant auto-verification!</i>"
                 )
                 full_keyboard = [
                     [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"confirm_{order_id}")],
@@ -2779,9 +2781,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏳ <b>Duration:</b> {days}\n"
                 f"💵 <b>Original Price:</b> ₹{amount}\n"
                 f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
+                f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
                 f"💰 <b>Your Balance:</b> ₹{user_bal:.2f}\n"
-                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n\n"
-                f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code for instant auto-verification!</i>"
+                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+                "⏳ <b>QR Expiry:</b> <code>5 Minutes</code>\n\n"
+                f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code within 5 minutes for instant auto-verification!</i>"
             )
             
             full_keyboard = [
