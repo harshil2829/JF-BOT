@@ -4185,11 +4185,114 @@ async def run_bot():
             
     asyncio.create_task(sync_telegram_bans())
 
-    # Handlers
+PANEL_URL = "https://harshilexe.alwaysdata.net"
+MASTER_SECRET = "harshil_master_hwid_reset_2026"
+
+async def register_reseller_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    if not args or len(args) < 2:
+        await update.message.reply_text(
+            "⚠️ <b>Format:</b> <code>/register &lt;username&gt; &lt;password&gt;</code>\n"
+            "Example: <code>/register rohit99 pass1234</code>",
+            parse_mode="HTML"
+        )
+        return
+        
+    username = args[0].strip()
+    password = args[1].strip()
+    telegram_id = str(update.effective_user.id)
+    
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{PANEL_URL}/api/bot_register_reseller.php",
+                json={
+                    "master_secret": MASTER_SECRET,
+                    "username": username,
+                    "password": password,
+                    "telegram_id": telegram_id,
+                    "initial_balance": 0
+                }
+            )
+            data = resp.json()
+            
+        if data.get("status"):
+            web_url = data.get("web_login_url", f"{PANEL_URL}/login.php")
+            api_key = data.get("api_key", "N/A")
+            await update.message.reply_text(
+                f"🎉 <b>Reseller Account Created Successfully!</b>\n\n"
+                f"🌐 <b>Panel URL:</b> {web_url}\n"
+                f"👤 <b>Username:</b> <code>{username}</code>\n"
+                f"🔑 <b>Password:</b> <code>{password}</code>\n"
+                f"🤖 <b>Bot API Key:</b> <code>{api_key}</code>\n\n"
+                f"You can now log in directly to the website or generate keys via bot!",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text(f"❌ Error: {data.get('message', 'Registration failed.')}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Connection Error: {e}")
+
+async def add_web_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    settings = load_settings()
+    admin_ids = settings.get("admin_ids", [])
+    if update.effective_user.id not in admin_ids:
+        await update.message.reply_text("⛔ Access Denied.")
+        return
+        
+    args = context.args
+    if not args or len(args) < 2:
+        await update.message.reply_text(
+            "⚠️ <b>Format:</b> <code>/addwebbalance &lt;username&gt; &lt;amount&gt;</code>\n"
+            "Example: <code>/addwebbalance rohit99 50</code>",
+            parse_mode="HTML"
+        )
+        return
+        
+    username = args[0].strip()
+    try:
+        amount = float(args[1].strip())
+    except ValueError:
+        await update.message.reply_text("❌ Invalid amount. Please specify a numeric amount.")
+        return
+        
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{PANEL_URL}/api/bot_add_balance.php",
+                json={
+                    "master_secret": MASTER_SECRET,
+                    "username": username,
+                    "amount": amount,
+                    "action": "add"
+                }
+            )
+            data = resp.json()
+            
+        if data.get("status"):
+            user_res = data.get("username", username)
+            new_bal = data.get("new_balance", 0.0)
+            await update.message.reply_text(
+                f"✅ <b>Balance Added Successfully!</b>\n\n"
+                f"👤 <b>User:</b> <code>{user_res}</code>\n"
+                f"💰 <b>Added:</b> +${amount:.2f}\n"
+                f"💵 <b>New Balance:</b> ${new_bal:.2f}",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text(f"❌ Error: {data.get('message', 'Failed to add balance.')}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Connection Error: {e}")
+
+# Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_my_id))
     application.add_handler(CommandHandler("help", help_cmd))
     application.add_handler(CommandHandler("admin", admin_panel))
+    application.add_handler(CommandHandler("register", register_reseller_cmd))
+    application.add_handler(CommandHandler("buyreseller", register_reseller_cmd))
+    application.add_handler(CommandHandler("addwebbalance", add_web_balance_cmd))
+    application.add_handler(CommandHandler("addbal", add_web_balance_cmd))
     application.add_handler(CommandHandler("set_welcome", set_welcome))
     application.add_handler(CommandHandler("add_admin", add_admin))
     application.add_handler(CommandHandler("bc", broadcast))
