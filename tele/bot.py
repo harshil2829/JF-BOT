@@ -2346,7 +2346,97 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
                     except: pass
                 return
+                
+    elif data.startswith("regconfirm_"):
+        parts = data.split("_")
+        order_id = parts[1]
+        scanner_amt = parts[2] if len(parts) > 2 else None
         
+        reg_info = context.user_data.get("pending_register", {})
+        if not reg_info or reg_info.get("order_id") != order_id:
+            await query.answer("❌ Invalid or expired registration order!", show_alert=True)
+            return
+            
+        created_at = reg_info.get("created_at", 0)
+        if created_at > 0 and (time.time() - created_at > 300):
+            expired_text = (
+                "⏰ <b>QR PAYMENT SESSION EXPIRED!</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ This registration QR session expired after <b>5 minutes</b>.\n"
+                "Please run <code>/register &lt;username&gt; &lt;password&gt;</code> again to get a fresh QR code."
+            )
+            back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Menu", callback_data="main_menu")]])
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=expired_text, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=expired_text, reply_markup=back_kb, parse_mode="HTML")
+            except: pass
+            return
+            
+        scanner_amt = scanner_amt or reg_info.get("scanner_amount")
+        if scanner_amt:
+            is_found = await check_fampay_email_utr(scanner_amt)
+            if is_found:
+                username = reg_info["username"]
+                password = reg_info["password"]
+                telegram_id = str(query.from_user.id)
+                
+                initial_credits = reg_info.get("initial_credits", 30.0)
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        resp = await client.post(
+                            f"{PANEL_URL}/api/bot_register_reseller.php",
+                            json={
+                                "master_secret": MASTER_SECRET,
+                                "username": username,
+                                "password": password,
+                                "telegram_id": telegram_id,
+                                "initial_balance": initial_credits
+                            }
+                        )
+                        reg_data = resp.json()
+                except Exception as e:
+                    reg_data = {"status": False, "message": str(e)}
+                    
+                if reg_data.get("status"):
+                    web_url = reg_data.get("web_login_url", f"{PANEL_URL}/login.php")
+                    api_key = reg_data.get("api_key", "N/A")
+                    
+                    success_text = (
+                        "🎉 <b>RESELLER ACCOUNT CREATED!</b>\n"
+                        "━━━━━━━━━━━━━━━━━━\n"
+                        f"💵 <b>Paid Amount:</b> ₹{scanner_amt}\n"
+                        f"🎁 <b>Pre-loaded Credits:</b> ${initial_credits:.2f}\n"
+                        f"🌐 <b>Panel URL:</b> {web_url}\n"
+                        f"👤 <b>Username:</b> <code>{username}</code>\n"
+                        f"🔑 <b>Password:</b> <code>{password}</code>\n"
+                        f"🤖 <b>Bot API Key:</b> <code>{api_key}</code>\n\n"
+                        "<i>You can now log in directly to the website or generate keys via bot!</i>"
+                    )
+                    try:
+                        if query.message.photo:
+                            await query.edit_message_caption(caption=success_text, parse_mode="HTML")
+                        else:
+                            await query.edit_message_text(text=success_text, parse_mode="HTML")
+                    except: pass
+                    
+                    context.user_data.pop("pending_register", None)
+                    
+                    settings = load_settings()
+                    for admin_id in settings.get("admin_ids", []):
+                        try:
+                            admin_msg = (
+                                f"🔔 <b>NEW RESELLER REGISTERED</b>\n"
+                                f"━━━━━━━━━━━━━━━━━━\n"
+                                f"👤 <b>User:</b> @{query.from_user.username or query.from_user.first_name} (<code>{query.from_user.id}</code>)\n"
+                                f"📛 <b>Username:</b> <code>{username}</code>\n"
+                                f"💵 <b>Paid:</b> ₹{scanner_amt} via FamPay\n"
+                            )
+                            await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
+                        except: pass
+                    return
+
         settings = load_settings()
         admin_messages = {}
         msg = (
@@ -4200,38 +4290,68 @@ async def register_reseller_cmd(update: Update, context: ContextTypes.DEFAULT_TY
         
     username = args[0].strip()
     password = args[1].strip()
-    telegram_id = str(update.effective_user.id)
     
+    settings = load_settings()
+    base_price = float(settings.get("reseller_registration_price", 1200.0))
+    initial_credits = float(settings.get("reseller_initial_credits", 30.0))
+    
+    # Generate Unique Order ID & Unique Paisa Discount
+    order_id = "REG" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    paisa_discount = random.randint(1, 99) / 100.0
+    scanner_amount = round(max(1.0, base_price - paisa_discount), 2)
+    scanner_amount_str = f"{scanner_amount:.2f}"
+    
+    context.user_data["pending_register"] = {
+        "username": username,
+        "password": password,
+        "amount": base_price,
+        "initial_credits": initial_credits,
+        "scanner_amount": scanner_amount_str,
+        "order_id": order_id,
+        "created_at": time.time()
+    }
+    
+    reply_text = (
+        "👑 <b>RESELLER ACCOUNT CHECKOUT</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Username:</b> <code>{username}</code>\n"
+        f"💵 <b>Registration Price:</b> ₹{base_price:.2f}\n"
+        f"🎁 <b>Pre-loaded Credits:</b> ${initial_credits:.2f}\n"
+        f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
+        f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
+        f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+        "⏳ <b>QR Expiry:</b> <code>5 Minutes</code>\n\n"
+        f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code within 5 minutes for instant reseller account creation!</i>"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"regconfirm_{order_id}_{scanner_amount_str}")],
+        [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
+    ]
+    
+    dynamic_qr_url = get_dynamic_qr_url(scanner_amount_str, order_id)
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f"{PANEL_URL}/api/bot_register_reseller.php",
-                json={
-                    "master_secret": MASTER_SECRET,
-                    "username": username,
-                    "password": password,
-                    "telegram_id": telegram_id,
-                    "initial_balance": 0
-                }
-            )
-            data = resp.json()
-            
-        if data.get("status"):
-            web_url = data.get("web_login_url", f"{PANEL_URL}/login.php")
-            api_key = data.get("api_key", "N/A")
-            await update.message.reply_text(
-                f"🎉 <b>Reseller Account Created Successfully!</b>\n\n"
-                f"🌐 <b>Panel URL:</b> {web_url}\n"
-                f"👤 <b>Username:</b> <code>{username}</code>\n"
-                f"🔑 <b>Password:</b> <code>{password}</code>\n"
-                f"🤖 <b>Bot API Key:</b> <code>{api_key}</code>\n\n"
-                f"You can now log in directly to the website or generate keys via bot!",
+        await update.message.reply_photo(
+            photo=dynamic_qr_url,
+            caption=reply_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    except Exception:
+        import os
+        if os.path.exists("qr.png"):
+            await update.message.reply_photo(
+                photo=open("qr.png", "rb"),
+                caption=reply_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="HTML"
             )
         else:
-            await update.message.reply_text(f"❌ Error: {data.get('message', 'Registration failed.')}")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Connection Error: {e}")
+            await update.message.reply_text(
+                reply_text + "\n\n⚠️ <i>(QR Code missing)</i>",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
 
 async def add_web_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = load_settings()
