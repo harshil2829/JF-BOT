@@ -907,6 +907,115 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Please enter a valid positive number.")
                 return
 
+    if state == "awaiting_reseller_creds":
+        if update.message.text in ["👑 Admin Panel", "/start", "/help", "cancel", "Cancel"]:
+            context.user_data["state"] = None
+        else:
+            parts = update.message.text.strip().split()
+            if len(parts) < 2:
+                await update.message.reply_text("❌ Invalid format. Please send: <code>username password</code> (e.g. <code>rohit99 pass1234</code>)", parse_mode="HTML")
+                return
+            username, password = parts[0], parts[1]
+            context.user_data["state"] = None
+            
+            settings = load_settings()
+            base_price = float(settings.get("reseller_registration_price", 1200.0))
+            initial_credits = float(settings.get("reseller_initial_credits", 30.0))
+            
+            order_id = "REG" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            paisa_discount = random.randint(1, 99) / 100.0
+            scanner_amount = round(max(1.0, base_price - paisa_discount), 2)
+            scanner_amount_str = f"{scanner_amount:.2f}"
+            
+            context.user_data["pending_register"] = {
+                "username": username,
+                "password": password,
+                "amount": base_price,
+                "initial_credits": initial_credits,
+                "scanner_amount": scanner_amount_str,
+                "order_id": order_id,
+                "created_at": time.time()
+            }
+            
+            reply_text = (
+                "👑 <b>RESELLER ACCOUNT CHECKOUT</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"👤 <b>Username:</b> <code>{username}</code>\n"
+                f"💵 <b>Registration Price:</b> ₹{base_price:.2f}\n"
+                f"🎁 <b>Pre-loaded Balance:</b> ${initial_credits:.2f}\n"
+                f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
+                f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
+                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+                "⏳ <b>QR Expiry:</b> <code>5 Minutes</code>\n\n"
+                f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code within 5 minutes for instant reseller account creation!</i>"
+            )
+            keyboard = [
+                [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"regconfirm_{order_id}_{scanner_amount_str}")],
+                [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
+            ]
+            dynamic_qr_url = get_dynamic_qr_url(scanner_amount_str, order_id)
+            try:
+                await update.message.reply_photo(photo=dynamic_qr_url, caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            except Exception:
+                await update.message.reply_text(reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            return
+
+    if state == "awaiting_web_credits_info":
+        if update.message.text in ["👑 Admin Panel", "/start", "/help", "cancel", "Cancel"]:
+            context.user_data["state"] = None
+        else:
+            parts = update.message.text.strip().split()
+            if len(parts) < 2:
+                await update.message.reply_text("❌ Invalid format. Please send: <code>username credits</code> (e.g. <code>rohit99 5</code>)", parse_mode="HTML")
+                return
+            username = parts[0]
+            try:
+                credits_amt = float(parts[1])
+                if credits_amt <= 0: raise ValueError
+            except:
+                await update.message.reply_text("❌ Invalid credit amount. Please enter a positive number.", parse_mode="HTML")
+                return
+                
+            context.user_data["state"] = None
+            inr_amount = credits_amt * 100.0  # 1 Credit = 100 INR
+            
+            order_id = "CRED" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            paisa_discount = random.randint(1, 99) / 100.0
+            scanner_amount = round(max(1.0, inr_amount - paisa_discount), 2)
+            scanner_amount_str = f"{scanner_amount:.2f}"
+            
+            context.user_data["pending_web_credits"] = {
+                "username": username,
+                "credits": credits_amt,
+                "inr_amount": inr_amount,
+                "scanner_amount": scanner_amount_str,
+                "order_id": order_id,
+                "created_at": time.time()
+            }
+            
+            reply_text = (
+                "💳 <b>BUY WEB CREDITS CHECKOUT</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"👤 <b>Web Username:</b> <code>{username}</code>\n"
+                f"🎁 <b>Credits Requested:</b> ${credits_amt:.2f}\n"
+                f"💵 <b>Total Price:</b> ₹{inr_amount:.2f} INR\n"
+                f"⚡ <b>SCANNER PAY AMOUNT:</b> <code>₹{scanner_amount_str}</code>\n"
+                f"💳 <b>Payee UPI ID:</b> <code>jadavharshil@fam</code>\n"
+                f"🆔 <b>Order ID:</b> <code>{order_id}</code>\n"
+                "⏳ <b>QR Expiry:</b> <code>5 Minutes</code>\n\n"
+                f"⚠️ <i>Pay EXACTLY <b>₹{scanner_amount_str}</b> via QR code within 5 minutes for instant credit delivery!</i>"
+            )
+            keyboard = [
+                [InlineKeyboardButton("✅ Paid Confirmation", callback_data=f"credconfirm_{order_id}_{scanner_amount_str}")],
+                [InlineKeyboardButton("« Cancel", callback_data="main_menu")]
+            ]
+            dynamic_qr_url = get_dynamic_qr_url(scanner_amount_str, order_id)
+            try:
+                await update.message.reply_photo(photo=dynamic_qr_url, caption=reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            except Exception:
+                await update.message.reply_text(reply_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+            return
+
     if state == "awaiting_new_product_name":
         if update.effective_user.id not in settings["admin_ids"]: return
         prod_name = update.message.text.strip().lower() if update.message.text else ""
@@ -1124,6 +1233,10 @@ def get_main_menu_keyboard():
         [
             InlineKeyboardButton("👤 My Profile", callback_data="profile"),
             InlineKeyboardButton("💰 Add Balance", callback_data="add_balance")
+        ],
+        [
+            InlineKeyboardButton("👑 Buy Reseller Acc (₹1200)", callback_data="reseller_buy_start"),
+            InlineKeyboardButton("💳 Buy Web Credits ($1=₹100)", callback_data="web_credits_buy_start")
         ],
         [
             InlineKeyboardButton("📋 All History", callback_data="history"),
@@ -2432,6 +2545,132 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 f"👤 <b>User:</b> @{query.from_user.username or query.from_user.first_name} (<code>{query.from_user.id}</code>)\n"
                                 f"📛 <b>Username:</b> <code>{username}</code>\n"
                                 f"💵 <b>Paid:</b> ₹{scanner_amt} via FamPay\n"
+                            )
+                            await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
+                        except: pass
+                    return
+
+    elif data == "reseller_buy_start":
+        context.user_data["state"] = "awaiting_reseller_creds"
+        msg_text = (
+            "👑 <b>BUY RESELLER ACCOUNT</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💵 <b>Price:</b> ₹1,200.00 INR\n"
+            "🎁 <b>Pre-loaded Balance:</b> $30.00 Credits Included!\n\n"
+            "Please send your desired <b>Username</b> and <b>Password</b> in chat:\n"
+            "<b>Format:</b> <code>username password</code>\n"
+            "<i>Example: rohit99 pass1234</i>"
+        )
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("« Cancel", callback_data="main_menu")]])
+        try:
+            if query.message.photo:
+                await query.edit_message_caption(caption=msg_text, reply_markup=back_kb, parse_mode="HTML")
+            else:
+                await query.edit_message_text(text=msg_text, reply_markup=back_kb, parse_mode="HTML")
+        except: pass
+        return
+
+    elif data == "web_credits_buy_start":
+        context.user_data["state"] = "awaiting_web_credits_info"
+        msg_text = (
+            "💳 <b>BUY WEB PANEL CREDITS</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "🔱 <b>Exchange Rate:</b> 1 Credit ($1) = <b>₹100 INR</b>\n\n"
+            "Please send your <b>Web Panel Username</b> and <b>Credits Amount</b> in chat:\n"
+            "<b>Format:</b> <code>username credits</code>\n"
+            "<i>Example: rohit99 5</i>  (adds $5.00 credits for ₹500 INR)"
+        )
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("« Cancel", callback_data="main_menu")]])
+        try:
+            if query.message.photo:
+                await query.edit_message_caption(caption=msg_text, reply_markup=back_kb, parse_mode="HTML")
+            else:
+                await query.edit_message_text(text=msg_text, reply_markup=back_kb, parse_mode="HTML")
+        except: pass
+        return
+
+    elif data.startswith("credconfirm_"):
+        parts = data.split("_")
+        order_id = parts[1]
+        scanner_amt = parts[2] if len(parts) > 2 else None
+        
+        cred_info = context.user_data.get("pending_web_credits", {})
+        if not cred_info or cred_info.get("order_id") != order_id:
+            await query.answer("❌ Invalid or expired order!", show_alert=True)
+            return
+            
+        created_at = cred_info.get("created_at", 0)
+        if created_at > 0 and (time.time() - created_at > 300):
+            expired_text = (
+                "⏰ <b>QR PAYMENT SESSION EXPIRED!</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ This credit purchase QR session expired after <b>5 minutes</b>.\n"
+                "Please click <b>'💳 Buy Web Credits'</b> again to get a fresh QR code."
+            )
+            back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Menu", callback_data="main_menu")]])
+            try:
+                if query.message.photo:
+                    await query.edit_message_caption(caption=expired_text, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await query.edit_message_text(text=expired_text, reply_markup=back_kb, parse_mode="HTML")
+            except: pass
+            return
+            
+        scanner_amt = scanner_amt or cred_info.get("scanner_amount")
+        if scanner_amt:
+            is_found = await check_fampay_email_utr(scanner_amt)
+            if is_found:
+                username = cred_info["username"]
+                credits_amt = cred_info["credits"]
+                
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        resp = await client.post(
+                            f"{PANEL_URL}/api/bot_add_balance.php",
+                            json={
+                                "master_secret": MASTER_SECRET,
+                                "username": username,
+                                "amount": credits_amt,
+                                "action": "add"
+                            }
+                        )
+                        cred_data = resp.json()
+                except Exception as e:
+                    cred_data = {"status": False, "message": str(e)}
+                    
+                if cred_data.get("status"):
+                    user_res = cred_data.get("username", username)
+                    new_bal = cred_data.get("new_balance", 0.0)
+                    
+                    success_text = (
+                        "🎉 <b>WEB CREDITS ADDED SUCCESSFULLY!</b>\n"
+                        "━━━━━━━━━━━━━━━━━━\n"
+                        f"💵 <b>Paid Amount:</b> ₹{scanner_amt}\n"
+                        f"👤 <b>Web Username:</b> <code>{user_res}</code>\n"
+                        f"💰 <b>Credits Added:</b> +${credits_amt:.2f}\n"
+                        f"💳 <b>New Web Balance:</b> ${new_bal:.2f}\n\n"
+                        "<i>Thank you for recharging your web panel balance!</i>"
+                    )
+                    try:
+                        if query.message.photo:
+                            await query.edit_message_caption(caption=success_text, parse_mode="HTML")
+                        else:
+                            await query.edit_message_text(text=success_text, parse_mode="HTML")
+                    except: pass
+                    
+                    context.user_data.pop("pending_web_credits", None)
+                    
+                    settings = load_settings()
+                    for admin_id in settings.get("admin_ids", []):
+                        try:
+                            admin_msg = (
+                                f"🔔 <b>WEB CREDITS PURCHASED</b>\n"
+                                f"━━━━━━━━━━━━━━━━━━\n"
+                                f"👤 <b>Telegram User:</b> @{query.from_user.username or query.from_user.first_name} (<code>{query.from_user.id}</code>)\n"
+                                f"📛 <b>Web Username:</b> <code>{username}</code>\n"
+                                f"💰 <b>Credits Added:</b> +${credits_amt:.2f}\n"
+                                f"💵 <b>Paid:</b> ₹{scanner_amt} via FamPay\n"
+                                f"💳 <b>New Balance:</b> ${new_bal:.2f}\n"
                             )
                             await context.bot.send_message(chat_id=admin_id, text=admin_msg, parse_mode="HTML")
                         except: pass
