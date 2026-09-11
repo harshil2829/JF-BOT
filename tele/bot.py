@@ -4593,7 +4593,24 @@ async def add_web_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         await update.message.reply_text(f"❌ Connection Error: {e}")
 
-# Handlers
+async def run_bot():
+    try:
+        trials = load_trials()
+        rebanned = 0
+        for uid, data in trials.items():
+            if data.get("strikes", 0) >= 3 and not data.get("banned", False):
+                data["banned"] = True
+                rebanned += 1
+        if rebanned > 0:
+            save_trials(trials)
+            print(f"Startup reban: {rebanned} users re-banned")
+    except Exception as e:
+        print(f"Startup reban error: {e}")
+
+    ensure_default_products()
+    application = Application.builder().token(TOKEN).build()
+
+    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_my_id))
     application.add_handler(CommandHandler("help", help_cmd))
