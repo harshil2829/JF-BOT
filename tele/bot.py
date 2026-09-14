@@ -589,11 +589,11 @@ async def generate_key_from_api(product, duration_label, product_id=None):
     if not product_id:
         try:
             web_products = load_web_products()
+            prod_clean = str(product).lower().replace("✔️", "").replace("✔", "").strip()
             for wp in web_products:
-                wp_name = (wp.get("name") or "").lower()
-                wp_disp = (wp.get("display_name") or "").lower()
-                prod_str = str(product).lower()
-                if prod_str == wp_name or prod_str == wp_disp:
+                wp_name = (wp.get("name") or "").lower().replace("✔️", "").replace("✔", "").strip()
+                wp_disp = (wp.get("display_name") or "").lower().replace("✔️", "").replace("✔", "").strip()
+                if prod_clean == wp_name or prod_clean == wp_disp or wp_name.startswith(prod_clean) or prod_clean.startswith(wp_name):
                     product_id = wp.get("id") or wp.get("product_id")
                     break
         except Exception as e:
@@ -2160,7 +2160,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode="HTML")
             return
 
-        product = data.split("_")[2]
+        product = data[len("claim_trial_"):].strip()
         user_id = str(update.effective_user.id)
         
         locked_products = settings.get("locked_products", {})
