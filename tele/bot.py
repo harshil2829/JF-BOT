@@ -586,6 +586,19 @@ async def generate_key_from_api(product, duration_label, product_id=None):
     }
     plan_id = plan_map.get(duration_label, duration_label)
     
+    if not product_id:
+        try:
+            web_products = load_web_products()
+            for wp in web_products:
+                wp_name = (wp.get("name") or "").lower()
+                wp_disp = (wp.get("display_name") or "").lower()
+                prod_str = str(product).lower()
+                if prod_str == wp_name or prod_str == wp_disp:
+                    product_id = wp.get("id") or wp.get("product_id")
+                    break
+        except Exception as e:
+            logger.error(f"Error matching product_id for {product}: {e}")
+    
     params = {
         "api_key": api_key,
         "product_id": product_id or 1,
@@ -597,8 +610,12 @@ async def generate_key_from_api(product, duration_label, product_id=None):
         try:
             response = await client.get(api_url, params=params, timeout=10)
             data = response.json()
-            if data.get("status") is True and data.get("keys"):
-                return data["keys"][0]
+            if data.get("status") is True:
+                if data.get("keys") and len(data["keys"]) > 0:
+                    return data["keys"][0]
+                elif data.get("key"):
+                    return data["key"]
+            logger.error(f"API key gen failed for product={product} (id={product_id}): {data}")
         except Exception as e:
             logger.error(f"API Error: {e}")
             
@@ -2198,12 +2215,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keys = load_keys()
         dict_key = f"{product}_trial"
         
-        delivered_key = None
-        if product == "hxn":
-            delivered_key = await generate_key_from_api("hxn", "1d")
-        elif dict_key in keys and len(keys[dict_key]) > 0:
-            delivered_key = keys[dict_key].pop(0)
-            save_keys(keys)
+        delivered_key = await generate_key_from_api(product, "1d")
+        if not delivered_key:
+            if dict_key in keys and len(keys[dict_key]) > 0:
+                delivered_key = keys[dict_key].pop(0)
+                save_keys(keys)
+            elif product in keys and len(keys[product]) > 0:
+                delivered_key = keys[product].pop(0)
+                save_keys(keys)
             
         if delivered_key:
             user_trial["last_trial"] = time.time()
