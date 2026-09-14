@@ -2217,12 +2217,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         delivered_key = await generate_key_from_api(product, "1d")
         if not delivered_key:
+            clean_p = product.replace("✔️", "").replace("✔", "").strip().lower()
+            dict_key = f"{clean_p}_trial"
             if dict_key in keys and len(keys[dict_key]) > 0:
                 delivered_key = keys[dict_key].pop(0)
+                save_keys(keys)
+            elif clean_p in keys and len(keys[clean_p]) > 0:
+                delivered_key = keys[clean_p].pop(0)
                 save_keys(keys)
             elif product in keys and len(keys[product]) > 0:
                 delivered_key = keys[product].pop(0)
                 save_keys(keys)
+                
+        logger.info(f"Trial claim for product '{product}': delivered_key={delivered_key}")
             
         if delivered_key:
             user_trial["last_trial"] = time.time()
