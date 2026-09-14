@@ -2228,6 +2228,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif product in keys and len(keys[product]) > 0:
                 delivered_key = keys[product].pop(0)
                 save_keys(keys)
+            else:
+                prefix = clean_p.upper().replace(" ", "")[:6] or "TRIAL"
+                random_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                delivered_key = f"{prefix}-{random_code[:4]}-{random_code[4:]}"
                 
         logger.info(f"Trial claim for product '{product}': delivered_key={delivered_key}")
             
